@@ -1,0 +1,41 @@
+{
+  "name": "my-game",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "nodemon --watch server --exec tsx server/index.ts",
+    "build": "next build",
+    "start": "NODE_ENV=production tsx server/index.ts",
+    "lint": "eslint"
+  },
+  "dependencies": {
+    "@colyseus/core": "^0.17.43",
+    "@colyseus/sdk": "^0.17.42",
+    "@colyseus/ws-transport": "^0.17.13",
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "mongoose": "^9.7.0",
+    "next": "16.2.9",
+    "phaser": "^4.1.0",
+    "react": "19.2.4",
+    "react-dom": "19.2.4"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.60.0",
+    "@tailwindcss/postcss": "^4",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^20.19.43",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.2.9",
+    "jest": "^30.4.2",
+    "nodemon": "^3.1.14",
+    "tailwindcss": "^4",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.22.4",
+    "typescript": "^5"
+  }
+}
