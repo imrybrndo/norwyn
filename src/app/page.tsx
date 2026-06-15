@@ -4,6 +4,8 @@ import React, { useState } from 'react';
 import GameLoader from '../components/GameLoader';
 import MainMenu from '../components/ui/MainMenu';
 import ChatBox from '../components/ui/ChatBox';
+import HUD from '../components/ui/HUD';
+import FacilitiesModal from '../components/ui/FacilitiesModal';
 
 export default function Home() {
     const [gameState, setGameState] = useState<{
@@ -54,7 +56,9 @@ export default function Home() {
                             isOnline={gameState.isOnline}
                         />
                     </div>
-                    {/* Overlay ChatBox inside the same relative container */}
+                    {/* Overlay React UI HUD, Facilities Shop and ChatBox */}
+                    <HUD />
+                    <FacilitiesModal />
                     <ChatBox />
 
                     {/* Floating Instructions Panel */}

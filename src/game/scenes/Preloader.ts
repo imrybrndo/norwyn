@@ -52,8 +52,9 @@ export class Preloader extends Phaser.Scene {
         });
 
         // Load map and tileset
-        this.load.tilemapTiledJSON('farm_map', '/assets/maps/farm.tmj');
-        this.load.image('sunnyside_tileset', '/assets/tilesets/spr_tileset_sunnysideworld.png');
+        this.load.tilemapTiledJSON('farm_map', '/assets/maps/farm-v2.tmj');
+        this.load.image('sunnyside_tileset_16px', '/assets/tilesets/spr_tileset_sunnysideworld_16px.png');
+        this.load.image('sunnyside_tileset_forest_32px', '/assets/tilesets/spr_tileset_sunnysideworld_forest_32px.png');
 
         // Load player sprite sheets
         this.load.spritesheet('player_base_walk', '/assets/sprites/characters/base_walk.png', {
@@ -76,6 +77,25 @@ export class Preloader extends Phaser.Scene {
                 frameHeight: 64
             });
         }
+
+        // Load crop sprites (wheat for rice, cabbage for vegetable, pumpkin for fruit, sunflower for golden_tree)
+        const cropMap = {
+            rice: 'wheat',
+            vegetable: 'cabbage',
+            fruit: 'pumpkin',
+            golden_tree: 'sunflower'
+        };
+
+        Object.entries(cropMap).forEach(([key, value]) => {
+            for (let i = 0; i <= 5; i++) {
+                const pad = String(i).padStart(2, '0');
+                this.load.image(`crop_${key}_stage_${i}`, `/assets/Elements/Crops/${value}_${pad}.png`);
+            }
+        });
+
+        this.load.image('seeds_generic', '/assets/Elements/Crops/seeds_generic.png');
+        this.load.image('soil_dry', '/assets/Elements/Crops/soil_00.png');
+        this.load.image('soil_wet', '/assets/Elements/Crops/soil_01.png');
     }
 
     create() {

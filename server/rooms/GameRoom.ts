@@ -1,13 +1,101 @@
 import { Room, Client } from '@colyseus/core';
-import { GameState, PlayerState } from './schema/GameState';
+import { GameState, PlayerState, InventoryItemState, CropState } from './schema/GameState';
 import User from '../db/models/User';
+
+// Helper to sync DB player stats to Colyseus schema state
+function syncPlayerState(player: PlayerState, user: any) {
+    player.gold = user.gold ?? 100;
+    player.energy = user.energy ?? 100;
+    player.hunger = user.hunger ?? 100;
+    player.wateringCanLevel = user.wateringCan?.level ?? 1;
+    player.wateringCanDurability = user.wateringCan?.durability ?? 100;
+
+    player.inventory.clear();
+    if (user.inventory) {
+        user.inventory.forEach((item: any) => {
+            const itemState = new InventoryItemState();
+            itemState.itemType = item.itemType;
+            itemState.count = item.count;
+            player.inventory.push(itemState);
+        });
+    }
+}
+
+// Helper to save current Colyseus player state to DB
+async function savePlayerToDb(player: PlayerState) {
+    try {
+        await User.updateOne({ username: player.username }, {
+            gold: player.gold,
+            energy: player.energy,
+            hunger: player.hunger,
+            wateringCan: {
+                level: player.wateringCanLevel,
+                durability: player.wateringCanDurability
+            },
+            inventory: player.inventory.map(item => ({
+                itemType: item.itemType,
+                count: item.count
+            }))
+        });
+    } catch (e) {
+        console.error(`Error saving user ${player.username} to DB:`, e);
+    }
+}
+
+function addToInventory(player: PlayerState, itemType: string, count: number) {
+    let item = player.inventory.find(i => i.itemType === itemType);
+    if (item) {
+        item.count += count;
+    } else {
+        const newItem = new InventoryItemState();
+        newItem.itemType = itemType;
+        newItem.count = count;
+        player.inventory.push(newItem);
+    }
+}
+
+function deductFromInventory(player: PlayerState, itemType: string, count: number): boolean {
+    let item = player.inventory.find(i => i.itemType === itemType);
+    if (item && item.count >= count) {
+        item.count -= count;
+        // Clean up 0 count items optionally, or just leave it
+        return true;
+    }
+    return false;
+}
 
 export class GameRoom extends Room<{ state: GameState }> {
     onCreate(options: any) {
         this.setState(new GameState());
 
+        // Setup server tick loop (runs every 10 seconds)
+        let tickCount = 0;
+        this.setSimulationInterval(() => {
+            tickCount++;
+            this.state.players.forEach(async (player: PlayerState) => {
+                let changed = false;
+
+                // 1. Passive energy recovery (only if Hunger > 0)
+                if (player.hunger > 0 && player.energy < 100) {
+                    player.energy = Math.min(100, player.energy + 1);
+                    changed = true;
+                }
+
+                // 2. Passive hunger drain (decreases by 1 every 30s)
+                if (tickCount % 3 === 0 && player.hunger > 0) {
+                    player.hunger = Math.max(0, player.hunger - 1);
+                    changed = true;
+                }
+
+                // Save to database if changed
+                if (changed) {
+                    await savePlayerToDb(player);
+                }
+            });
+        }, 10000);
+
         // Handle movement updates
-        this.onMessage('move', (client, data: { x: number, y: number, direction: string, isMoving: boolean }) => {
+        this.onMessage('move', (client: Client, data: { x: number, y: number, direction: string, isMoving: boolean }) => {
             const player = this.state.players.get(client.sessionId);
             if (player) {
                 player.x = data.x;
@@ -17,8 +105,342 @@ export class GameRoom extends Room<{ state: GameState }> {
             }
         });
 
+        // Buy Seed Pack (Gacha System) - Cost: 20 Gold
+        this.onMessage('buySeed', async (client: Client) => {
+            const player = this.state.players.get(client.sessionId);
+            if (!player) return;
+
+            if (player.gold < 20) {
+                client.send('error', 'Not enough gold!');
+                return;
+            }
+
+            player.gold -= 20;
+
+            // Roll Gacha
+            // Level 3 Upgrade: improves high tier crop rate
+            const isLvl3 = player.wateringCanLevel >= 3;
+            const roll = Math.random() * 100;
+            let seedType = 'seed_rice';
+
+            if (isLvl3) {
+                // Higher tier crop rates at level 3
+                if (roll < 30) seedType = 'seed_rice';        // 30%
+                else if (roll < 74) seedType = 'seed_vegetable'; // 44%
+                else if (roll < 97) seedType = 'seed_fruit';     // 23%
+                else seedType = 'seed_golden_tree';              // 3%
+            } else {
+                // Standard GDD rates
+                if (roll < 50) seedType = 'seed_rice';        // 50%
+                else if (roll < 84) seedType = 'seed_vegetable'; // 34%
+                else if (roll < 99) seedType = 'seed_fruit';     // 15%
+                else seedType = 'seed_golden_tree';              // 1%
+            }
+
+            addToInventory(player, seedType, 1);
+            await savePlayerToDb(player);
+            client.send('toast', { type: 'success', message: `Got ${seedType.replace('seed_', '')} seed!` });
+        });
+
+        // Plant Seed - requires seed, tile coordinates, and deducts Energy + Durability
+        this.onMessage('plantSeed', async (client: Client, data: { tileX: number, tileY: number, seedType: string }) => {
+            const player = this.state.players.get(client.sessionId);
+            if (!player) return;
+
+            const tileKey = `${data.tileX}_${data.tileY}`;
+            if (this.state.crops.has(tileKey)) {
+                client.send('error', 'Tile already has a crop!');
+                return;
+            }
+
+            // Energy & Durability cost depending on crop
+            let energyCost = 2;
+            let growthTime = 10000; // default rice 10s
+            let cropType = 'rice';
+
+            if (data.seedType === 'seed_rice') {
+                energyCost = 2;
+                growthTime = 10000;
+                cropType = 'rice';
+            } else if (data.seedType === 'seed_vegetable') {
+                energyCost = 8;
+                growthTime = 60000; // 60s
+                cropType = 'vegetable';
+            } else if (data.seedType === 'seed_fruit') {
+                energyCost = 15;
+                growthTime = 90000; // 90s
+                cropType = 'fruit';
+            } else if (data.seedType === 'seed_golden_tree') {
+                energyCost = 20;
+                growthTime = 120000; // 120s
+                cropType = 'golden_tree';
+            } else {
+                client.send('error', 'Invalid seed type!');
+                return;
+            }
+
+            // Apply Level 4 Energy Cost discount (20% reduction)
+            if (player.wateringCanLevel >= 4) {
+                energyCost = Math.round(energyCost * 0.8);
+            }
+
+            // Apply Level 2 Growth Speed discount (10% faster)
+            if (player.wateringCanLevel >= 2) {
+                growthTime = Math.round(growthTime * 0.9);
+            }
+
+            if (player.energy < energyCost) {
+                client.send('error', 'Not enough energy!');
+                return;
+            }
+
+            if (player.wateringCanDurability < 1) {
+                client.send('error', 'Watering can is broken! Repair it at Tool Repair.');
+                return;
+            }
+
+            // Deduct seed
+            if (!deductFromInventory(player, data.seedType, 1)) {
+                client.send('error', 'No seeds of that type in inventory!');
+                return;
+            }
+
+            // Deduct stats
+            player.energy -= energyCost;
+            player.wateringCanDurability -= 1;
+
+            // Create Crop
+            const crop = new CropState();
+            crop.id = tileKey;
+            crop.tileX = data.tileX;
+            crop.tileY = data.tileY;
+            crop.cropType = cropType;
+            crop.plantedAt = Date.now();
+            crop.readyAt = Date.now() + growthTime;
+            crop.watered = false; // Must be watered to grow/harvest
+            crop.ownerId = client.sessionId;
+
+            this.state.crops.set(tileKey, crop);
+            await savePlayerToDb(player);
+        });
+
+        // Water Crop
+        this.onMessage('waterCrop', async (client: Client, data: { tileX: number, tileY: number }) => {
+            const player = this.state.players.get(client.sessionId);
+            if (!player) return;
+
+            const tileKey = `${data.tileX}_${data.tileY}`;
+            const crop = this.state.crops.get(tileKey);
+            if (!crop) {
+                client.send('error', 'No crop at this tile!');
+                return;
+            }
+
+            if (crop.watered) {
+                client.send('error', 'Crop is already watered!');
+                return;
+            }
+
+            if (player.wateringCanDurability < 1) {
+                client.send('error', 'Watering can is broken!');
+                return;
+            }
+
+            let energyCost = 1;
+            if (player.wateringCanLevel >= 4) {
+                energyCost = 0; // level 4 cuts it down, let's say 0 energy for watering
+            }
+
+            if (player.energy < energyCost) {
+                client.send('error', 'Not enough energy!');
+                return;
+            }
+
+            player.energy -= energyCost;
+            player.wateringCanDurability -= 1;
+            crop.watered = true;
+
+            await savePlayerToDb(player);
+        });
+
+        // Harvest Crop
+        this.onMessage('harvestCrop', async (client: Client, data: { tileX: number, tileY: number }) => {
+            const player = this.state.players.get(client.sessionId);
+            if (!player) return;
+
+            const tileKey = `${data.tileX}_${data.tileY}`;
+            const crop = this.state.crops.get(tileKey);
+            if (!crop) {
+                client.send('error', 'No crop here!');
+                return;
+            }
+
+            if (!crop.watered) {
+                client.send('error', 'Crop was never watered! It cannot grow without water.');
+                return;
+            }
+
+            if (Date.now() < crop.readyAt) {
+                client.send('error', 'Crop is not ready for harvest yet!');
+                return;
+            }
+
+            // Remove crop and add to inventory
+            this.state.crops.delete(tileKey);
+            addToInventory(player, `crop_${crop.cropType}`, 1);
+            await savePlayerToDb(player);
+            client.send('toast', { type: 'success', message: `Harvested ${crop.cropType}!` });
+        });
+
+        // Sell Crops
+        this.onMessage('sellCrop', async (client: Client, data: { cropType: string, count: number }) => {
+            const player = this.state.players.get(client.sessionId);
+            if (!player) return;
+
+            const itemType = `crop_${data.cropType}`;
+            let sellPrice = 0;
+
+            if (data.cropType === 'rice') sellPrice = 2;
+            else if (data.cropType === 'vegetable') sellPrice = 50;
+            else if (data.cropType === 'fruit') sellPrice = 100;
+            else if (data.cropType === 'golden_tree') sellPrice = 200;
+            else {
+                client.send('error', 'Invalid crop type for sale!');
+                return;
+            }
+
+            const totalEarnings = sellPrice * data.count;
+            if (deductFromInventory(player, itemType, data.count)) {
+                player.gold += totalEarnings;
+                await savePlayerToDb(player);
+                client.send('toast', { type: 'success', message: `Sold crops for ${totalEarnings} Gold!` });
+            } else {
+                client.send('error', 'Not enough crops to sell!');
+            }
+        });
+
+        // Buy Food
+        this.onMessage('buyFood', async (client: Client, data: { foodType: string }) => {
+            const player = this.state.players.get(client.sessionId);
+            if (!player) return;
+
+            let price = 0;
+            if (data.foodType === 'food_bread') price = 10;
+            else if (data.foodType === 'food_rice_bowl') price = 25;
+            else {
+                client.send('error', 'Invalid food item!');
+                return;
+            }
+
+            if (player.gold < price) {
+                client.send('error', 'Not enough gold!');
+                return;
+            }
+
+            player.gold -= price;
+            addToInventory(player, data.foodType, 1);
+            await savePlayerToDb(player);
+        });
+
+        // Eat Food
+        this.onMessage('eatFood', async (client: Client, data: { foodType: string }) => {
+            const player = this.state.players.get(client.sessionId);
+            if (!player) return;
+
+            if (deductFromInventory(player, data.foodType, 1)) {
+                if (data.foodType === 'food_bread') {
+                    player.energy = Math.min(100, player.energy + 10);
+                    player.hunger = Math.min(100, player.hunger + 20);
+                } else if (data.foodType === 'food_rice_bowl') {
+                    player.energy = Math.min(100, player.energy + 30);
+                    player.hunger = Math.min(100, player.hunger + 50);
+                }
+                await savePlayerToDb(player);
+                client.send('toast', { type: 'success', message: `Ate food. Energy/Hunger restored!` });
+            } else {
+                client.send('error', 'You do not have that food!');
+            }
+        });
+
+        // Sleep House (Apartment) - Cost: 40 Gold
+        this.onMessage('sleep', async (client: Client) => {
+            const player = this.state.players.get(client.sessionId);
+            if (!player) return;
+
+            if (player.gold < 40) {
+                client.send('error', 'Need 40 Gold to sleep!');
+                return;
+            }
+
+            player.gold -= 40;
+            player.energy = 100; // Full restore
+            // Hunger is not restored by sleeping
+            await savePlayerToDb(player);
+            client.send('toast', { type: 'success', message: 'Rested! Energy fully restored.' });
+        });
+
+        // Repair Watering Can
+        this.onMessage('repairTool', async (client: Client, data: { option: 'dur_25' | 'dur_50' | 'dur_full' }) => {
+            const player = this.state.players.get(client.sessionId);
+            if (!player) return;
+
+            let cost = 0;
+            let repairAmount = 0;
+
+            if (data.option === 'dur_25') {
+                cost = 15;
+                repairAmount = 25;
+            } else if (data.option === 'dur_50') {
+                cost = 25;
+                repairAmount = 50;
+            } else if (data.option === 'dur_full') {
+                cost = 40;
+                repairAmount = 100;
+            } else {
+                client.send('error', 'Invalid repair option!');
+                return;
+            }
+
+            if (player.gold < cost) {
+                client.send('error', 'Not enough gold!');
+                return;
+            }
+
+            player.gold -= cost;
+            player.wateringCanDurability = Math.min(100, player.wateringCanDurability + repairAmount);
+            await savePlayerToDb(player);
+            client.send('toast', { type: 'success', message: 'Watering Can repaired!' });
+        });
+
+        // Upgrade Watering Can
+        this.onMessage('upgradeTool', async (client: Client) => {
+            const player = this.state.players.get(client.sessionId);
+            if (!player) return;
+
+            const nextLvl = player.wateringCanLevel + 1;
+            let cost = 0;
+
+            if (nextLvl === 2) cost = 300;
+            else if (nextLvl === 3) cost = 700;
+            else if (nextLvl === 4) cost = 1500;
+            else {
+                client.send('error', 'Tool already at maximum level!');
+                return;
+            }
+
+            if (player.gold < cost) {
+                client.send('error', 'Not enough gold to upgrade!');
+                return;
+            }
+
+            player.gold -= cost;
+            player.wateringCanLevel = nextLvl;
+            await savePlayerToDb(player);
+            client.send('toast', { type: 'success', message: `Watering Can upgraded to Level ${nextLvl}!` });
+        });
+
         // Handle chat messages
-        this.onMessage('chat', (client, data: { text: string }) => {
+        this.onMessage('chat', (client: Client, data: { text: string }) => {
             const player = this.state.players.get(client.sessionId);
             if (player) {
                 this.broadcast('chat-message', {
@@ -36,14 +458,13 @@ export class GameRoom extends Room<{ state: GameState }> {
 
         const username = options.username || `Player_${client.sessionId.substring(0, 5)}`;
         
-        let clothesIndex = 1;
+        let dbUser;
         try {
             // Find user in MongoDB, create if not found
-            let user = await User.findOne({ username });
-            if (!user) {
-                user = await User.create({ username, clothesIndex: 1 });
+            dbUser = await User.findOne({ username });
+            if (!dbUser) {
+                dbUser = await User.create({ username, clothesIndex: 1 });
             }
-            clothesIndex = user.clothesIndex;
         } catch (e) {
             console.error('Error fetching user from database on join:', e);
         }
@@ -53,7 +474,11 @@ export class GameRoom extends Room<{ state: GameState }> {
         player.username = username;
         player.x = 240; // Default spawn coordinates
         player.y = 240;
-        player.clothesIndex = clothesIndex;
+        player.clothesIndex = dbUser?.clothesIndex ?? 1;
+
+        if (dbUser) {
+            syncPlayerState(player, dbUser);
+        }
 
         this.state.players.set(client.sessionId, player);
     }

@@ -1,4 +1,9 @@
-import { Schema, type, MapSchema } from '@colyseus/schema';
+import { Schema, type, MapSchema, ArraySchema } from '@colyseus/schema';
+
+export class InventoryItemState extends Schema {
+    @type("string") itemType: string = "";
+    @type("number") count: number = 0;
+}
 
 export class PlayerState extends Schema {
     @type("string") id: string = "";
@@ -8,8 +13,26 @@ export class PlayerState extends Schema {
     @type("string") direction: string = "down";
     @type("boolean") isMoving: boolean = false;
     @type("number") clothesIndex: number = 1;
+    @type("number") gold: number = 100;
+    @type("number") energy: number = 100;
+    @type("number") hunger: number = 100;
+    @type("number") wateringCanLevel: number = 1;
+    @type("number") wateringCanDurability: number = 100;
+    @type([InventoryItemState]) inventory = new ArraySchema<InventoryItemState>();
+}
+
+export class CropState extends Schema {
+    @type("string") id: string = ""; // Format: "x_y"
+    @type("number") tileX: number = 0;
+    @type("number") tileY: number = 0;
+    @type("string") cropType: string = "";
+    @type("number") plantedAt: number = 0;
+    @type("number") readyAt: number = 0;
+    @type("boolean") watered: boolean = false;
+    @type("string") ownerId: string = "";
 }
 
 export class GameState extends Schema {
     @type({ map: PlayerState }) players = new MapSchema<PlayerState>();
+    @type({ map: CropState }) crops = new MapSchema<CropState>();
 }
