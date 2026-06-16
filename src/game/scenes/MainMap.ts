@@ -11,6 +11,7 @@ export class MainMap extends Phaser.Scene {
     player!: Player;
     environmentLayer!: Phaser.Tilemaps.TilemapLayer;
     groundLayer!: Phaser.Tilemaps.TilemapLayer;
+    groundDetailLayer!: Phaser.Tilemaps.TilemapLayer;
     aboveLayer!: Phaser.Tilemaps.TilemapLayer;
     
     room: Room<GameState> | null = null;
@@ -60,6 +61,21 @@ export class MainMap extends Phaser.Scene {
 
     // Store last sent movement packet to avoid redundant network floods
     lastSentData: { x: number; y: number; direction: string; isMoving: boolean } | null = null;
+
+    tileAnimations: Array<{
+        firstgid: number;
+        tilesetName: string;
+        tileId: number;
+        frames: Array<{ tileid: number; duration: number }>;
+        currentFrame: number;
+        elapsed: number;
+    }> = [];
+    animatedTileCoords: Array<{
+        layer: Phaser.Tilemaps.TilemapLayer;
+        x: number;
+        y: number;
+        animIndex: number;
+    }> = [];
 
     constructor() {
         super('MainMap');
@@ -150,66 +166,56 @@ export class MainMap extends Phaser.Scene {
     facilities: Array<{ id: string; x: number; y: number; width: number; height: number; color: number; label: string }> = [];
 
     createFacilityPlaceholders(map: Phaser.Tilemaps.Tilemap) {
-        const getObjectCoords = (layerName: string) => {
-            const layer = map.getObjectLayer(layerName);
-            if (layer && layer.objects && layer.objects.length > 0) {
-                const obj = layer.objects[0];
-                if (obj.x !== undefined && obj.y !== undefined && obj.width !== undefined && obj.height !== undefined) {
-                    return {
-                        x: obj.x + obj.width / 2,
-                        y: obj.y + obj.height / 2,
-                        width: obj.width,
-                        height: obj.height
-                    };
-                }
-            }
-            return null;
-        };
-
-        // 1. Seed Shop
-        const seedShopObj = getObjectCoords('SeedShop');
-        if (seedShopObj) {
-            this.facilities.push({ id: 'seed_shop', x: seedShopObj.x, y: seedShopObj.y, width: seedShopObj.width, height: seedShopObj.height, color: 0x10b981, label: 'SEED SHOP' });
-        } else {
+        const interactablesLayer = map.getObjectLayer('Interactables');
+        if (!interactablesLayer || !interactablesLayer.objects) {
+            // Fallbacks if layer doesn't exist
             this.facilities.push({ id: 'seed_shop', x: 240, y: 150, width: 40, height: 40, color: 0x10b981, label: 'SEED SHOP' });
-        }
-
-        // 2. Food House
-        const foodHouseObj = getObjectCoords('Food House');
-        if (foodHouseObj) {
-            this.facilities.push({ id: 'food_house', x: foodHouseObj.x, y: foodHouseObj.y, width: foodHouseObj.width, height: foodHouseObj.height, color: 0xf59e0b, label: 'FOOD HOUSE' });
-        } else {
             this.facilities.push({ id: 'food_house', x: 120, y: 200, width: 40, height: 40, color: 0xf59e0b, label: 'FOOD HOUSE' });
-        }
-
-        // 3. Tool Repair
-        const toolRepairObj = getObjectCoords('Tool Repair');
-        if (toolRepairObj) {
-            this.facilities.push({ id: 'tool_repair', x: toolRepairObj.x, y: toolRepairObj.y, width: toolRepairObj.width, height: toolRepairObj.height, color: 0x8b5cf6, label: 'TOOL REPAIR' });
-        } else {
             this.facilities.push({ id: 'tool_repair', x: 240, y: 320, width: 40, height: 40, color: 0x8b5cf6, label: 'TOOL REPAIR' });
+            this.facilities.push({ id: 'sleep_house', x: 360, y: 200, width: 40, height: 40, color: 0x3b82f6, label: 'SLEEP HOUSE' });
+            
+            this.facilities.forEach(fac => {
+                const wall = this.physics.add.staticImage(fac.x, fac.y, '');
+                wall.setSize(fac.width, fac.height);
+                // @ts-ignore
+                wall.setVisible(false);
+                this.physics.add.collider(this.player, wall);
+            });
+            return;
         }
 
-        // 4. Beds (Parsed from the 'Bed' Object Layer)
-        const bedLayer = map.getObjectLayer('Bed');
         let hasBeds = false;
-        if (bedLayer && bedLayer.objects) {
-            bedLayer.objects.forEach(obj => {
-                if (obj.x !== undefined && obj.y !== undefined && obj.width !== undefined && obj.height !== undefined) {
-                    hasBeds = true;
-                    const label = obj.name || 'BED';
-                    this.facilities.push({
-                        id: 'sleep_house',
-                        x: obj.x + obj.width / 2,
-                        y: obj.y + obj.height / 2,
-                        width: obj.width,
-                        height: obj.height,
-                        color: 0x3b82f6,
-                        label: label.toUpperCase()
-                    });
+
+        interactablesLayer.objects.forEach(obj => {
+            if (obj.x === undefined || obj.y === undefined) return;
+
+            const width = obj.width || 16;
+            const height = obj.height || 16;
+            const x = obj.x + width / 2;
+            const y = obj.y + height / 2;
+
+            if (obj.type === 'shop') {
+                if (obj.name === 'SeedShop') {
+                    this.facilities.push({ id: 'seed_shop', x, y, width, height, color: 0x10b981, label: 'SEED SHOP' });
+                } else if (obj.name === 'Food House') {
+                    this.facilities.push({ id: 'food_house', x, y, width, height, color: 0xf59e0b, label: 'FOOD HOUSE' });
+                } else if (obj.name === 'Tool Repair') {
+                    this.facilities.push({ id: 'tool_repair', x, y, width, height, color: 0x8b5cf6, label: 'TOOL REPAIR' });
                 }
-            });
-        }
+            } else if (obj.type === 'bed') {
+                hasBeds = true;
+                const label = obj.name || 'BED';
+                this.facilities.push({
+                    id: 'sleep_house',
+                    x,
+                    y,
+                    width,
+                    height,
+                    color: 0x3b82f6,
+                    label: label.toUpperCase()
+                });
+            }
+        });
 
         // Fallback sleep house if no beds are defined
         if (!hasBeds) {
@@ -553,6 +559,11 @@ export class MainMap extends Phaser.Scene {
         this.groundLayer = map.createLayer('Ground', tilesets, 0, 0) as Phaser.Tilemaps.TilemapLayer;
         this.groundLayer.setCollisionByProperty({ collides: true });
 
+        this.groundDetailLayer = map.createLayer('Ground_Detail', tilesets, 0, 0) as Phaser.Tilemaps.TilemapLayer;
+        if (this.groundDetailLayer) {
+            this.groundDetailLayer.setCollisionByProperty({ collides: true });
+        }
+
         this.environmentLayer = map.createLayer('Environment', tilesets, 0, 0) as Phaser.Tilemaps.TilemapLayer;
         this.environmentLayer.setCollisionByExclusion([-1]);
 
@@ -560,6 +571,9 @@ export class MainMap extends Phaser.Scene {
         this.player = new Player(this, 240, 240, username, clothesIndex);
         this.physics.add.collider(this.player, this.environmentLayer);
         this.physics.add.collider(this.player, this.groundLayer);
+        if (this.groundDetailLayer) {
+            this.physics.add.collider(this.player, this.groundDetailLayer);
+        }
 
         // Above layer for roofs and treetops (rendered above player)
         this.aboveLayer = map.createLayer('Above', tilesets, 0, 0) as Phaser.Tilemaps.TilemapLayer;
@@ -573,23 +587,86 @@ export class MainMap extends Phaser.Scene {
         this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
         this.cameras.main.setZoom(2.5);
 
-        // 6b. Dynamically load FarmPlots boundaries from Tiled JSON objects
-        const plotsLayer = map.getObjectLayer('FarmPlots');
-        if (plotsLayer) {
-            plotsLayer.objects.forEach(obj => {
-                if (obj.x !== undefined && obj.y !== undefined && obj.width !== undefined && obj.height !== undefined) {
-                    this.farmPlots.push({
-                        x: obj.x,
-                        y: obj.y,
-                        width: obj.width,
-                        height: obj.height
+        // 6b. Parse Interactables Layer (shops, beds, and farm plots)
+        const interactablesLayer = map.getObjectLayer('Interactables');
+        if (interactablesLayer && interactablesLayer.objects) {
+            interactablesLayer.objects.forEach(obj => {
+                if (obj.type === 'farm_plot' || obj.name.startsWith('lahan_')) {
+                    if (obj.x !== undefined && obj.y !== undefined && obj.width !== undefined && obj.height !== undefined) {
+                        this.farmPlots.push({
+                            x: obj.x,
+                            y: obj.y,
+                            width: obj.width,
+                            height: obj.height
+                        });
+                    }
+                }
+            });
+        }
+
+        // 6c. Spawn visible building/shop/bed placeholders on the map with collision boundaries
+        this.createFacilityPlaceholders(map);
+
+        // 6d. Parse tile animations from raw Tiled JSON
+        const rawMap = this.cache.json.get('farm_map');
+        const tileAnims: Array<{
+            firstgid: number;
+            tilesetName: string;
+            tileId: number;
+            frames: Array<{ tileid: number; duration: number }>;
+            currentFrame: number;
+            elapsed: number;
+        }> = [];
+
+        if (rawMap && rawMap.tilesets) {
+            rawMap.tilesets.forEach((ts: any) => {
+                if (ts.tiles) {
+                    ts.tiles.forEach((tile: any) => {
+                        if (tile.animation && tile.animation.length > 0) {
+                            tileAnims.push({
+                                firstgid: ts.firstgid,
+                                tilesetName: ts.name,
+                                tileId: tile.id,
+                                frames: tile.animation,
+                                currentFrame: 0,
+                                elapsed: 0
+                            });
+                        }
                     });
                 }
             });
         }
 
-        // 6c. Spawn visible building/shop placeholders on the map with collision boundaries
-        this.createFacilityPlaceholders(map);
+        const animatedTileCoords: Array<{
+            layer: Phaser.Tilemaps.TilemapLayer;
+            x: number;
+            y: number;
+            animIndex: number;
+        }> = [];
+
+        const layers = [this.groundLayer, this.groundDetailLayer, this.environmentLayer, this.aboveLayer].filter(Boolean) as Phaser.Tilemaps.TilemapLayer[];
+
+        layers.forEach(layer => {
+            layer.forEachTile(tile => {
+                const tileIndex = tile.index;
+                for (let i = 0; i < tileAnims.length; i++) {
+                    const anim = tileAnims[i];
+                    const startGid = anim.firstgid + anim.tileId;
+                    if (tileIndex === startGid) {
+                        animatedTileCoords.push({
+                            layer,
+                            x: tile.x,
+                            y: tile.y,
+                            animIndex: i
+                        });
+                        break;
+                    }
+                }
+            });
+        });
+        
+        this.tileAnimations = tileAnims;
+        this.animatedTileCoords = animatedTileCoords;
 
         // 7. Input: Click on grid to plant/water/harvest
         this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
@@ -779,7 +856,7 @@ export class MainMap extends Phaser.Scene {
         });
     }
 
-    update() {
+    update(time: number, delta: number) {
         if (this.player) {
             this.player.update();
             this.checkProximityTrigger();
@@ -835,5 +912,32 @@ export class MainMap extends Phaser.Scene {
 
         // Update crop visual timers
         this.updateCropsVisuals();
+
+        // Update animated tiles
+        if (this.tileAnimations && this.tileAnimations.length > 0) {
+            const frameChanged = this.tileAnimations.map((anim) => {
+                anim.elapsed += delta;
+                const currentDuration = anim.frames[anim.currentFrame].duration;
+                if (anim.elapsed >= currentDuration) {
+                    anim.elapsed = anim.elapsed % currentDuration;
+                    anim.currentFrame = (anim.currentFrame + 1) % anim.frames.length;
+                    return true;
+                }
+                return false;
+            });
+
+            this.animatedTileCoords.forEach(coords => {
+                if (frameChanged[coords.animIndex]) {
+                    const anim = this.tileAnimations[coords.animIndex];
+                    const nextTileId = anim.frames[anim.currentFrame].tileid;
+                    const nextGid = anim.firstgid + nextTileId;
+                    
+                    const tile = coords.layer.getTileAt(coords.x, coords.y);
+                    if (tile) {
+                        tile.index = nextGid;
+                    }
+                }
+            });
+        }
     }
 }
