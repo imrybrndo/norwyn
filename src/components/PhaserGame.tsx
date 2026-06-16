@@ -9,9 +9,10 @@ interface PhaserGameProps {
     username: string;
     clothesIndex: number;
     isOnline: boolean;
+    walletAddress?: string;
 }
 
-export default function PhaserGame({ username, clothesIndex, isOnline }: PhaserGameProps) {
+export default function PhaserGame({ username, clothesIndex, isOnline, walletAddress }: PhaserGameProps) {
     const gameRef = useRef<Phaser.Game | null>(null);
 
     useEffect(() => {
@@ -25,6 +26,9 @@ export default function PhaserGame({ username, clothesIndex, isOnline }: PhaserG
             game.registry.set('username', username);
             game.registry.set('clothesIndex', clothesIndex);
             game.registry.set('isOnline', isOnline);
+            if (walletAddress) {
+                game.registry.set('walletAddress', walletAddress);
+            }
 
             gameRef.current = game;
 
@@ -37,7 +41,8 @@ export default function PhaserGame({ username, clothesIndex, isOnline }: PhaserG
                 gameRef.current = null;
             }
         };
-    }, [username, clothesIndex, isOnline]);
+    }, [username, clothesIndex, isOnline, walletAddress]);
+
 
     return (
         <div 

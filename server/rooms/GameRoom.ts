@@ -4,11 +4,20 @@ import User from '../db/models/User';
 
 // Helper to sync DB player stats to Colyseus schema state
 function syncPlayerState(player: PlayerState, user: any) {
+    player.walletAddress = user.walletAddress ?? "";
+    player.role = user.role ?? "Farmer";
+    player.gender = user.gender ?? "Male";
+    player.avatarStyle = user.avatarStyle ?? 1;
+    player.clothesIndex = user.clothesIndex ?? user.avatarStyle ?? 1;
     player.gold = user.gold ?? 100;
     player.energy = user.energy ?? 100;
     player.hunger = user.hunger ?? 100;
     player.wateringCanLevel = user.wateringCan?.level ?? 1;
     player.wateringCanDurability = user.wateringCan?.durability ?? 100;
+    player.axeLevel = user.axe?.level ?? 1;
+    player.axeDurability = user.axe?.durability ?? 100;
+    player.fishingRodLevel = user.fishingRod?.level ?? 1;
+    player.fishingRodDurability = user.fishingRod?.durability ?? 100;
 
     player.inventory.clear();
     if (user.inventory) {
@@ -24,13 +33,33 @@ function syncPlayerState(player: PlayerState, user: any) {
 // Helper to save current Colyseus player state to DB
 async function savePlayerToDb(player: PlayerState) {
     try {
-        await User.updateOne({ username: player.username }, {
+        const query = player.walletAddress 
+            ? { walletAddress: player.walletAddress } 
+            : { username: player.username };
+
+        await User.updateOne(query, {
             gold: player.gold,
+            offChainCoins: player.gold,
+            off_chain_coins: player.gold,
             energy: player.energy,
+            currentEnergy: player.energy,
+            current_energy: player.energy,
             hunger: player.hunger,
+            gender: player.gender,
+            avatarStyle: player.avatarStyle,
+            avatar_style: player.avatarStyle,
+            clothesIndex: player.avatarStyle,
             wateringCan: {
                 level: player.wateringCanLevel,
                 durability: player.wateringCanDurability
+            },
+            axe: {
+                level: player.axeLevel,
+                durability: player.axeDurability
+            },
+            fishingRod: {
+                level: player.fishingRodLevel,
+                durability: player.fishingRodDurability
             },
             inventory: player.inventory.map(item => ({
                 itemType: item.itemType,
@@ -453,7 +482,7 @@ export class GameRoom extends Room<{ state: GameState }> {
         });
     }
 
-    async onJoin(client: Client, options: { username: string }) {
+    async onJoin(client: Client, options: { username: string; walletAddress?: string }) {
         console.log(`${client.sessionId} joined!`);
 
         const username = options.username || `Player_${client.sessionId.substring(0, 5)}`;
@@ -461,9 +490,18 @@ export class GameRoom extends Room<{ state: GameState }> {
         let dbUser;
         try {
             // Find user in MongoDB, create if not found
-            dbUser = await User.findOne({ username });
+            if (options.walletAddress) {
+                dbUser = await User.findOne({ walletAddress: options.walletAddress });
+            } else {
+                dbUser = await User.findOne({ username });
+            }
+
             if (!dbUser) {
-                dbUser = await User.create({ username, clothesIndex: 1 });
+                const userFields: any = { username, clothesIndex: 1 };
+                if (options.walletAddress) {
+                    userFields.walletAddress = options.walletAddress;
+                }
+                dbUser = await User.create(userFields);
             }
         } catch (e) {
             console.error('Error fetching user from database on join:', e);

@@ -146,35 +146,68 @@ export class MainMap extends Phaser.Scene {
         });
     }
 
-    createFacilityPlaceholders() {
-        // Defined visual shops/facilities to match coordinates
-        const facilities = [
-            { id: 'seed_shop', x: 240, y: 150, color: 0x10b981, label: 'SEED SHOP' },
-            { id: 'food_house', x: 120, y: 200, color: 0xf59e0b, label: 'FOOD HOUSE' },
-            { id: 'sleep_house', x: 360, y: 200, color: 0x3b82f6, label: 'SLEEP HOUSE' },
-            { id: 'tool_repair', x: 240, y: 320, color: 0x8b5cf6, label: 'TOOL REPAIR' }
-        ];
+    facilities: Array<{ id: string; x: number; y: number; width: number; height: number; color: number; label: string }> = [];
 
-        facilities.forEach(fac => {
-            // Draw visual shop shape placeholder (40x40 px)
-            const rect = this.add.graphics();
-            rect.fillStyle(fac.color, 0.85);
-            rect.lineStyle(2, 0xffffff, 1);
-            rect.fillRect(fac.x - 20, fac.y - 20, 40, 40);
-            rect.strokeRect(fac.x - 20, fac.y - 20, 40, 40);
+    createFacilityPlaceholders(map: Phaser.Tilemaps.Tilemap) {
+        const getObjectCoords = (layerName: string) => {
+            const layer = map.getObjectLayer(layerName);
+            if (layer && layer.objects && layer.objects.length > 0) {
+                const obj = layer.objects[0];
+                if (obj.x !== undefined && obj.y !== undefined && obj.width !== undefined && obj.height !== undefined) {
+                    return {
+                        x: obj.x + obj.width / 2,
+                        y: obj.y + obj.height / 2,
+                        width: obj.width,
+                        height: obj.height
+                    };
+                }
+            }
+            return null;
+        };
 
-            // Add text label above the building
-            this.add.text(fac.x, fac.y - 32, fac.label, {
-                fontSize: '8px',
-                color: '#ffffff',
-                backgroundColor: '#00000088',
-                padding: { x: 3, y: 1.5 },
-                fontStyle: 'bold'
-            }).setOrigin(0.5);
+        // 1. Seed Shop
+        const seedShopObj = getObjectCoords('SeedShop');
+        if (seedShopObj) {
+            this.facilities.push({ id: 'seed_shop', x: seedShopObj.x, y: seedShopObj.y, width: seedShopObj.width, height: seedShopObj.height, color: 0x10b981, label: 'SEED SHOP' });
+        } else {
+            this.facilities.push({ id: 'seed_shop', x: 240, y: 150, width: 40, height: 40, color: 0x10b981, label: 'SEED SHOP' });
+        }
 
-            // Create a static physics boundary box
+        // 2. Food House
+        const foodHouseObj = getObjectCoords('Food House');
+        if (foodHouseObj) {
+            this.facilities.push({ id: 'food_house', x: foodHouseObj.x, y: foodHouseObj.y, width: foodHouseObj.width, height: foodHouseObj.height, color: 0xf59e0b, label: 'FOOD HOUSE' });
+        } else {
+            this.facilities.push({ id: 'food_house', x: 120, y: 200, width: 40, height: 40, color: 0xf59e0b, label: 'FOOD HOUSE' });
+        }
+
+        // 3. Tool Repair
+        const toolRepairObj = getObjectCoords('Tool Repair');
+        if (toolRepairObj) {
+            this.facilities.push({ id: 'tool_repair', x: toolRepairObj.x, y: toolRepairObj.y, width: toolRepairObj.width, height: toolRepairObj.height, color: 0x8b5cf6, label: 'TOOL REPAIR' });
+        } else {
+            this.facilities.push({ id: 'tool_repair', x: 240, y: 320, width: 40, height: 40, color: 0x8b5cf6, label: 'TOOL REPAIR' });
+        }
+
+        // 4. Beds (Bed1 & Bed2 for sleeping)
+        const bed1Obj = getObjectCoords('Bed1');
+        if (bed1Obj) {
+            this.facilities.push({ id: 'sleep_house', x: bed1Obj.x, y: bed1Obj.y, width: bed1Obj.width, height: bed1Obj.height, color: 0x3b82f6, label: 'BED 1' });
+        }
+        const bed2Obj = getObjectCoords('Bed2');
+        if (bed2Obj) {
+            this.facilities.push({ id: 'sleep_house', x: bed2Obj.x, y: bed2Obj.y, width: bed2Obj.width, height: bed2Obj.height, color: 0x3b82f6, label: 'BED 2' });
+        }
+
+        // Fallback sleep house if no beds are defined
+        if (!bed1Obj && !bed2Obj) {
+            this.facilities.push({ id: 'sleep_house', x: 360, y: 200, width: 40, height: 40, color: 0x3b82f6, label: 'SLEEP HOUSE' });
+        }
+
+        this.facilities.forEach(fac => {
+            // Create a static physics boundary box matching the object dimensions
             const wall = this.physics.add.staticImage(fac.x, fac.y, '');
-            wall.setSize(40, 40);
+            wall.setSize(fac.width, fac.height);
             // @ts-ignore
             wall.setVisible(false);
             this.physics.add.collider(this.player, wall);
@@ -184,18 +217,10 @@ export class MainMap extends Phaser.Scene {
     checkProximityTrigger() {
         if (!this.player) return;
 
-        // Facility coordinate check positions
-        const facilities = [
-            { id: 'seed_shop', x: 240, y: 150 },
-            { id: 'food_house', x: 120, y: 200 },
-            { id: 'sleep_house', x: 360, y: 200 },
-            { id: 'tool_repair', x: 240, y: 320 }
-        ];
-
         let closest: string | null = null;
         let minDist = 40; // max interaction distance in pixels
 
-        facilities.forEach(fac => {
+        this.facilities.forEach(fac => {
             const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, fac.x, fac.y);
             if (dist < minDist) {
                 minDist = dist;
@@ -473,6 +498,7 @@ export class MainMap extends Phaser.Scene {
         const username = this.registry.get('username') || 'Farmer';
         const clothesIndex = this.registry.get('clothesIndex') || 1;
         const isOnline = this.registry.get('isOnline') || false;
+        const walletAddress = this.registry.get('walletAddress');
 
         // 2. Generate animations
         createAnimations(this);
@@ -510,7 +536,7 @@ export class MainMap extends Phaser.Scene {
         this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
         this.cameras.main.setZoom(2.5);
 
-        // 6b. Dynamically load FarmPlots boundaries from Tiled JSON objects and draw them
+        // 6b. Dynamically load FarmPlots boundaries from Tiled JSON objects
         const plotsLayer = map.getObjectLayer('FarmPlots');
         if (plotsLayer) {
             plotsLayer.objects.forEach(obj => {
@@ -521,23 +547,12 @@ export class MainMap extends Phaser.Scene {
                         width: obj.width,
                         height: obj.height
                     });
-
-                    // Draw tilled border highlights around plots so the player sees where to till
-                    const border = this.add.graphics();
-                    border.lineStyle(1.5, 0xd97706, 0.6); // Semi-transparent Amber
-                    border.strokeRect(obj.x, obj.y, obj.width, obj.height);
-                    
-                    this.add.text(obj.x + 4, obj.y + 4, obj.name || 'FARM LAND', {
-                        fontSize: '5px',
-                        color: '#d97706',
-                        fontStyle: 'bold'
-                    }).setDepth(1);
                 }
             });
         }
 
         // 6c. Spawn visible building/shop placeholders on the map with collision boundaries
-        this.createFacilityPlaceholders();
+        this.createFacilityPlaceholders(map);
 
         // 7. Input: Click on grid to plant/water/harvest
         this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
@@ -581,7 +596,7 @@ export class MainMap extends Phaser.Scene {
 
         // 8. Setup online multiplayer if selected
         if (isOnline) {
-            this.connectToRoom(username, clothesIndex);
+            this.connectToRoom(username, clothesIndex, walletAddress);
         } else {
             // Emits initial default stats when offline
             this.time.delayedCall(100, () => this.emitLocalStats());
@@ -625,8 +640,8 @@ export class MainMap extends Phaser.Scene {
         });
     }
 
-    connectToRoom(username: string, clothesIndex: number) {
-        colyseusClient.joinOrCreate('game_room', { username, clothesIndex }, GameState).then(room => {
+    connectToRoom(username: string, clothesIndex: number, walletAddress?: string) {
+        colyseusClient.joinOrCreate('game_room', { username, clothesIndex, walletAddress }, GameState).then(room => {
             this.room = room;
             console.log('Joined room:', room.roomId);
 

@@ -8,6 +8,10 @@ export class InventoryItemState extends Schema {
 export class PlayerState extends Schema {
     @type("string") id: string = "";
     @type("string") username: string = "";
+    @type("string") walletAddress: string = ""; // [NEW] Web3 Wallet
+    @type("string") role: string = "Farmer"; // [NEW] Profession role
+    @type("string") gender: string = "Male"; // [NEW] Character gender
+    @type("number") avatarStyle: number = 1; // [NEW] Character visual style
     @type("number") x: number = 0;
     @type("number") y: number = 0;
     @type("string") direction: string = "down";
@@ -18,8 +22,13 @@ export class PlayerState extends Schema {
     @type("number") hunger: number = 100;
     @type("number") wateringCanLevel: number = 1;
     @type("number") wateringCanDurability: number = 100;
+    @type("number") axeLevel: number = 1; // [NEW] Woodcutter tool level
+    @type("number") axeDurability: number = 100; // [NEW] Woodcutter tool durability
+    @type("number") fishingRodLevel: number = 1; // [NEW] Fisher tool level
+    @type("number") fishingRodDurability: number = 100; // [NEW] Fisher tool durability
     @type([InventoryItemState]) inventory = new ArraySchema<InventoryItemState>();
 }
+
 
 export class CropState extends Schema {
     @type("string") id: string = ""; // Format: "x_y"

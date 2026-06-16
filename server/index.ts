@@ -26,7 +26,13 @@ nextApp.prepare().then(async () => {
 
     const app = express();
     app.use(cors());
-    app.use(express.json());
+    app.use((req, res, nextMiddleware) => {
+        if (req.url && (req.url.startsWith('/colyseus') || req.url.startsWith('/matchmake'))) {
+            express.json()(req, res, nextMiddleware);
+        } else {
+            nextMiddleware();
+        }
+    });
 
     const server = http.createServer(app);
 

@@ -16,8 +16,10 @@ interface GameLoaderProps {
     username: string;
     clothesIndex: number;
     isOnline: boolean;
+    walletAddress?: string;
 }
 
 export default function GameLoader(props: GameLoaderProps) {
     return <PhaserGame {...props} />;
 }
+
