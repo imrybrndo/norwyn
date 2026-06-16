@@ -289,6 +289,8 @@ export class GameRoom extends Room<{ state: GameState }> {
             player.wateringCanDurability -= 1;
             crop.watered = true;
 
+            this.broadcast('player-watered', { sessionId: client.sessionId });
+
             await savePlayerToDb(player);
         });
 

@@ -89,7 +89,9 @@ export default function LandingHero({
 
                     {/* Main CTA & Wallet Controls */}
                     <div className="flex flex-col items-center gap-4 w-full max-w-sm">
-                        {!connected ? (
+                        {!mounted ? (
+                            <div className="w-full h-24 bg-slate-100 rounded-2xl animate-pulse border-2 border-slate-200" />
+                        ) : !connected ? (
                             <div className="flex flex-col items-center gap-3 w-full">
                                 <button
                                     onClick={handlePlayNow}

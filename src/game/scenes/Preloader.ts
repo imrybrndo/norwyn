@@ -78,6 +78,24 @@ export class Preloader extends Phaser.Scene {
             });
         }
 
+        // Load watering animations
+        this.load.spritesheet('player_base_watering', '/assets/Characters/Human/WATERING/base_watering_strip5.png', {
+            frameWidth: 96,
+            frameHeight: 64
+        });
+        this.load.spritesheet('player_tools_watering', '/assets/Characters/Human/WATERING/tools_watering_strip5.png', {
+            frameWidth: 96,
+            frameHeight: 64
+        });
+        for (let i = 1; i <= 3; i++) {
+            const hairNames = ['bowlhair', 'curlyhair', 'longhair'];
+            const hairName = hairNames[i - 1];
+            this.load.spritesheet(`player_clothes_watering_${i}`, `/assets/Characters/Human/WATERING/${hairName}_watering_strip5.png`, {
+                frameWidth: 96,
+                frameHeight: 64
+            });
+        }
+
         // Load crop sprites (wheat for rice, cabbage for vegetable, pumpkin for fruit, sunflower for golden_tree)
         const cropMap = {
             rice: 'wheat',

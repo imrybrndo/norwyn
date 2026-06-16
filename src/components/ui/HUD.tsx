@@ -164,9 +164,9 @@ export default function HUD() {
                 {/* Seeds Slots */}
                 <div className="flex gap-2">
                     {[
-                        { type: 'seed_rice', name: 'Rice', emoji: '🌾' },
-                        { type: 'seed_vegetable', name: 'Veg', emoji: '🥬' },
-                        { type: 'seed_fruit', name: 'Fruit', emoji: '🍎' },
+                        { type: 'seed_rice', name: 'Rice', image: '/padi.png' },
+                        { type: 'seed_vegetable', name: 'Vegy', emoji: '🥬' },
+                        { type: 'seed_fruit', name: 'Apple', emoji: '🍎' },
                         { type: 'seed_golden_tree', name: 'Golden', emoji: '⭐' }
                     ].map(seed => {
                         const count = getInventoryCount(seed.type);
@@ -180,7 +180,11 @@ export default function HUD() {
                                     activeItem === seed.type ? 'border-emerald-500 bg-emerald-500/20 text-white' : 'border-gray-700 bg-gray-950/60 text-gray-300 hover:border-gray-500'
                                 }`}
                             >
-                                <span className="text-lg">{seed.emoji}</span>
+                                {seed.image ? (
+                                    <img src={seed.image} className="w-5 h-5 object-contain" alt={seed.name} />
+                                ) : (
+                                    <span className="text-lg">{seed.emoji}</span>
+                                )}
                                 <span className="text-[9px] font-semibold mt-0.5">{seed.name}</span>
                                 <span className="absolute -top-1.5 -right-1.5 bg-gray-800 text-white border border-gray-600 text-[10px] w-5 h-5 flex items-center justify-center rounded-full font-bold">
                                     {count}

@@ -151,9 +151,15 @@ export default function FacilitiesModal() {
                                     <div className="w-full bg-gray-950/40 p-4 rounded-xl border border-gray-800/50 mt-2 text-xs text-gray-400">
                                         <div className="font-bold mb-2 text-gray-300 uppercase tracking-wide">Pack Probabilities:</div>
                                         <div className="grid grid-cols-2 gap-2 font-mono">
-                                            <div className="flex justify-between"><span>🌾 Padi (Rice):</span><span className="text-green-400">50%</span></div>
-                                            <div className="flex justify-between"><span>🥬 Sayur (Veg):</span><span className="text-green-400">34%</span></div>
-                                            <div className="flex justify-between"><span>🍎 Buah (Fruit):</span><span className="text-green-400">15%</span></div>
+                                            <div className="flex justify-between items-center">
+                                                <span className="flex items-center gap-1.5">
+                                                    <img src="/padi.png" className="w-4 h-4 object-contain inline-block" alt="Rice" />
+                                                    Rice:
+                                                </span>
+                                                <span className="text-green-400">50%</span>
+                                            </div>
+                                            <div className="flex justify-between"><span>🥬 Vegy:</span><span className="text-green-400">34%</span></div>
+                                            <div className="flex justify-between"><span>🍎 Apple:</span><span className="text-green-400">15%</span></div>
                                             <div className="flex justify-between"><span>⭐ Golden Tree:</span><span className="text-green-400">1%</span></div>
                                         </div>
                                         {stats.wateringCanLevel >= 3 && (
@@ -166,16 +172,20 @@ export default function FacilitiesModal() {
                             ) : (
                                 <div className="flex flex-col gap-3">
                                     {[
-                                        { type: 'rice', name: 'Rice Crop', emoji: '🌾', price: 2 },
-                                        { type: 'vegetable', name: 'Vegetable', emoji: '🥬', price: 50 },
-                                        { type: 'fruit', name: 'Fruit Crop', emoji: '🍎', price: 100 },
+                                        { type: 'rice', name: 'Rice', image: '/padi.png', price: 2 },
+                                        { type: 'vegetable', name: 'Vegy', emoji: '🥬', price: 50 },
+                                        { type: 'fruit', name: 'Apple', emoji: '🍎', price: 100 },
                                         { type: 'golden_tree', name: 'Golden Tree Wood', emoji: '⭐', price: 200 }
                                     ].map(crop => {
                                         const count = getInventoryCount(`crop_${crop.type}`);
                                         return (
                                             <div key={crop.type} className="flex items-center justify-between bg-gray-950 p-3.5 rounded-xl border border-gray-800">
                                                 <div className="flex items-center gap-3">
-                                                    <span className="text-2xl">{crop.emoji}</span>
+                                                    {crop.image ? (
+                                                        <img src={crop.image} className="w-8 h-8 object-contain" alt={crop.name} />
+                                                    ) : (
+                                                        <span className="text-2xl">{crop.emoji}</span>
+                                                    )}
                                                     <div>
                                                         <h4 className="font-bold">{crop.name}</h4>
                                                         <p className="text-xs text-gray-400">Sell: {crop.price} Gold each</p>

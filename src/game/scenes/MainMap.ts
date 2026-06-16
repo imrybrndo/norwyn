@@ -98,13 +98,14 @@ export class MainMap extends Phaser.Scene {
         const cropSprite = this.add.image(x, y - 4, `crop_${crop.cropType}_stage_${stage}`);
         cropSprite.setDepth(2);
 
-        // Growth text timer
+        // Growth text timer (sharp & crisp)
         const timer = this.add.text(x, y - 12, '', {
-            fontSize: '6px',
+            fontFamily: 'monospace',
+            fontSize: '24px',
             color: '#ffffff',
             backgroundColor: '#00000066',
-            padding: { x: 2, y: 1 }
-        }).setOrigin(0.5).setDepth(3);
+            padding: { x: 4, y: 2 }
+        }).setOrigin(0.5).setScale(0.25).setDepth(3);
 
         this.cropObjects.set(tileKey, { soil, crop: cropSprite, timer });
     }
@@ -189,18 +190,29 @@ export class MainMap extends Phaser.Scene {
             this.facilities.push({ id: 'tool_repair', x: 240, y: 320, width: 40, height: 40, color: 0x8b5cf6, label: 'TOOL REPAIR' });
         }
 
-        // 4. Beds (Bed1 & Bed2 for sleeping)
-        const bed1Obj = getObjectCoords('Bed1');
-        if (bed1Obj) {
-            this.facilities.push({ id: 'sleep_house', x: bed1Obj.x, y: bed1Obj.y, width: bed1Obj.width, height: bed1Obj.height, color: 0x3b82f6, label: 'BED 1' });
-        }
-        const bed2Obj = getObjectCoords('Bed2');
-        if (bed2Obj) {
-            this.facilities.push({ id: 'sleep_house', x: bed2Obj.x, y: bed2Obj.y, width: bed2Obj.width, height: bed2Obj.height, color: 0x3b82f6, label: 'BED 2' });
+        // 4. Beds (Parsed from the 'Bed' Object Layer)
+        const bedLayer = map.getObjectLayer('Bed');
+        let hasBeds = false;
+        if (bedLayer && bedLayer.objects) {
+            bedLayer.objects.forEach(obj => {
+                if (obj.x !== undefined && obj.y !== undefined && obj.width !== undefined && obj.height !== undefined) {
+                    hasBeds = true;
+                    const label = obj.name || 'BED';
+                    this.facilities.push({
+                        id: 'sleep_house',
+                        x: obj.x + obj.width / 2,
+                        y: obj.y + obj.height / 2,
+                        width: obj.width,
+                        height: obj.height,
+                        color: 0x3b82f6,
+                        label: label.toUpperCase()
+                    });
+                }
+            });
         }
 
         // Fallback sleep house if no beds are defined
-        if (!bed1Obj && !bed2Obj) {
+        if (!hasBeds) {
             this.facilities.push({ id: 'sleep_house', x: 360, y: 200, width: 40, height: 40, color: 0x3b82f6, label: 'SLEEP HOUSE' });
         }
 
@@ -211,6 +223,19 @@ export class MainMap extends Phaser.Scene {
             // @ts-ignore
             wall.setVisible(false);
             this.physics.add.collider(this.player, wall);
+
+            // Add high-resolution crisp label above the facility
+            const textX = fac.x;
+            const textY = fac.y - fac.height / 2 - 6;
+            this.add.text(textX, textY, fac.label, {
+                fontFamily: 'monospace',
+                fontSize: '32px',
+                color: '#ffffff',
+                fontStyle: 'bold',
+                stroke: '#000000',
+                strokeThickness: 6,
+                padding: { x: 4, y: 4 }
+            }).setOrigin(0.5).setScale(0.18).setDepth(11);
         });
     }
 
@@ -295,7 +320,14 @@ export class MainMap extends Phaser.Scene {
             }
 
             this.addLocalInventory(seedType, 1);
-            EventBus.emit('network-toast', { type: 'success', message: `Bought seed pack: Got ${seedType.replace('seed_', '')}!` });
+            const friendlyNames: Record<string, string> = {
+                seed_rice: 'Rice',
+                seed_vegetable: 'Vegy',
+                seed_fruit: 'Apple',
+                seed_golden_tree: 'Golden Tree'
+            };
+            const friendlyName = friendlyNames[seedType] || seedType.replace('seed_', '');
+            EventBus.emit('network-toast', { type: 'success', message: `Bought seed pack: Got ${friendlyName}!` });
             this.emitLocalStats();
         }
 
@@ -417,6 +449,8 @@ export class MainMap extends Phaser.Scene {
                     return;
                 }
 
+                this.player.playWateringAnimation();
+
                 this.localStats.energy -= energyCost;
                 this.localStats.wateringCanDurability -= 1;
                 crop.watered = true;
@@ -517,12 +551,15 @@ export class MainMap extends Phaser.Scene {
 
         // 4. Create map layers
         this.groundLayer = map.createLayer('Ground', tilesets, 0, 0) as Phaser.Tilemaps.TilemapLayer;
+        this.groundLayer.setCollisionByProperty({ collides: true });
+
         this.environmentLayer = map.createLayer('Environment', tilesets, 0, 0) as Phaser.Tilemaps.TilemapLayer;
         this.environmentLayer.setCollisionByExclusion([-1]);
 
         // 5. Spawn local player
         this.player = new Player(this, 240, 240, username, clothesIndex);
         this.physics.add.collider(this.player, this.environmentLayer);
+        this.physics.add.collider(this.player, this.groundLayer);
 
         // Above layer for roofs and treetops (rendered above player)
         this.aboveLayer = map.createLayer('Above', tilesets, 0, 0) as Phaser.Tilemaps.TilemapLayer;
@@ -581,6 +618,7 @@ export class MainMap extends Phaser.Scene {
 
             if (this.activeItem === 'watering_can') {
                 if (crop && !crop.watered) {
+                    this.player.playWateringAnimation();
                     this.room.send('waterCrop', { tileX, tileY });
                 }
             } else if (this.activeItem === 'harvest') {
@@ -647,6 +685,18 @@ export class MainMap extends Phaser.Scene {
 
             // Notify UI about successful connection
             EventBus.emit('connection-status', { connected: true, sessionId: room.sessionId });
+
+            // Listen for watering animation broadcast
+            room.onMessage('player-watered', (data: { sessionId: string }) => {
+                if (data.sessionId === room.sessionId) {
+                    this.player.playWateringAnimation();
+                } else {
+                    const other = this.otherPlayers.get(data.sessionId);
+                    if (other) {
+                        other.playWateringAnimation();
+                    }
+                }
+            });
 
             const callbacks = Callbacks.get(room);
 

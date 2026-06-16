@@ -2,6 +2,9 @@ import express from 'express';
 import http from 'http';
 import next from 'next';
 import cors from 'cors';
+import { loadEnvConfig } from '@next/env';
+
+loadEnvConfig(process.cwd());
 
 // Prevent WebSocket frame errors or HMR disconnects from crashing the server
 process.on('uncaughtException', (err) => {

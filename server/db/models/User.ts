@@ -79,7 +79,7 @@ const UserSchema: Schema = new Schema({
 }, { timestamps: true });
 
 // Pre-save hook to keep snake_case and camelCase parameters synchronized
-UserSchema.pre('save', async function (this: IUser) {
+UserSchema.pre('save', function (this: IUser) {
     if (this.isModified('gold')) {
         this.offChainCoins = this.gold;
         this.off_chain_coins = this.gold;
@@ -132,6 +132,8 @@ UserSchema.pre('save', async function (this: IUser) {
             y: this.last_coordinates.y
         };
     }
+
+
 });
 
 export default mongoose.models.User || mongoose.model<IUser>('User', UserSchema);
