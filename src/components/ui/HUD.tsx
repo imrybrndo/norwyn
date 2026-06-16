@@ -1,7 +1,23 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { EventBus } from '../../game/EventBus';
+import { 
+    Coins, 
+    Flame, 
+    Utensils, 
+    Backpack, 
+    Settings, 
+    X, 
+    Send, 
+    Volume2, 
+    VolumeX, 
+    Keyboard, 
+    Award,
+    CheckCircle,
+    User,
+    HelpCircle
+} from 'lucide-react';
 
 interface InventoryItem {
     itemType: string;
@@ -15,7 +31,43 @@ interface PlayerStats {
     wateringCanLevel: number;
     wateringCanDurability: number;
     inventory: InventoryItem[];
+    username?: string;
 }
+
+interface ChatMessage {
+    senderId: string;
+    username: string;
+    text: string;
+    timestamp: number;
+}
+
+// Map item types to metadata (names, emojis/images, descriptions)
+const getItemMetadata = (itemType: string) => {
+    switch (itemType) {
+        case 'seed_rice':
+            return { name: 'Rice Seed', image: '/padi.png', desc: 'Plant to grow fresh rice.' };
+        case 'seed_vegetable':
+            return { name: 'Vegy Seed', emoji: '🥬', desc: 'Plant to grow crunchy vegetables.' };
+        case 'seed_fruit':
+            return { name: 'Apple Seed', emoji: '🍎', desc: 'Plant to grow sweet apples.' };
+        case 'seed_golden_tree':
+            return { name: 'Golden Seed', emoji: '⭐', desc: 'A rare seed that grows golden wood.' };
+        case 'crop_rice':
+            return { name: 'Rice Crop', image: '/padi.png', desc: 'Harvested rice. Sell at the seed shop.' };
+        case 'crop_vegetable':
+            return { name: 'Fresh Vegy', emoji: '🥬', desc: 'Harvested vegetable. Sell at the seed shop.' };
+        case 'crop_fruit':
+            return { name: 'Apple Crop', emoji: '🍎', desc: 'Harvested apple. Sell at the seed shop.' };
+        case 'crop_golden_tree':
+            return { name: 'Golden Wood', emoji: '⭐', desc: 'Extremely rare wood. Worth a lot of gold.' };
+        case 'food_bread':
+            return { name: 'Fresh Bread', emoji: '🍞', desc: 'Restores 10 Energy and 20 Hunger.', type: 'food' };
+        case 'food_rice_bowl':
+            return { name: 'Rice Bowl', emoji: '🍚', desc: 'Restores 30 Energy and 50 Hunger.', type: 'food' };
+        default:
+            return { name: itemType.replace('_', ' '), emoji: '📦', desc: 'A pixel item.' };
+    }
+};
 
 export default function HUD() {
     const [stats, setStats] = useState<PlayerStats>({
@@ -24,7 +76,8 @@ export default function HUD() {
         hunger: 100,
         wateringCanLevel: 1,
         wateringCanDurability: 100,
-        inventory: []
+        inventory: [],
+        username: 'Farmer'
     });
 
     const [activeItem, setActiveItem] = useState<string>('harvest'); // default to hand/harvest
@@ -32,10 +85,42 @@ export default function HUD() {
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
     const [nearFacility, setNearFacility] = useState<string | null>(null);
 
+    // Modals Visibility
+    const [activeModal, setActiveModal] = useState<'inventory' | 'quests' | 'settings' | null>(null);
+    const [soundEnabled, setSoundEnabled] = useState(true);
+
+    // Chat States
+    const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+    const [chatInputText, setChatInputText] = useState('');
+    const [isChatFocused, setIsChatFocused] = useState(false);
+    const chatListRef = useRef<HTMLDivElement>(null);
+    const chatInputRef = useRef<HTMLInputElement>(null);
+
+    // Hover Tooltip State
+    const [hoveredItem, setHoveredItem] = useState<string | null>(null);
+
+    // Define 9 slots items
+    const hotbarSlots = [
+        { key: 1, type: 'harvest', name: 'Hand', emoji: '✋' },
+        { key: 2, type: 'watering_can', name: 'Water', emoji: '💧' },
+        { key: 3, type: 'seed_rice', name: 'Rice Seed', image: '/padi.png' },
+        { key: 4, type: 'seed_vegetable', name: 'Vegy Seed', emoji: '🥬' },
+        { key: 5, type: 'seed_fruit', name: 'Apple Seed', emoji: '🍎' },
+        { key: 6, type: 'seed_golden_tree', name: 'Golden Seed', emoji: '⭐' },
+        { key: 7, type: 'food_bread', name: 'Bread', emoji: '🍞', isFood: true },
+        { key: 8, type: 'food_rice_bowl', name: 'Rice Bowl', emoji: '🍚', isFood: true },
+        { key: 9, type: 'placeholder', name: 'Empty', emoji: '❌', disabled: true }
+    ];
+
     useEffect(() => {
-        // Listen to stats changes from Colyseus
+        // Sync stats changes
         const onStatsChanged = (newStats: PlayerStats) => {
-            setStats(newStats);
+            setStats(prev => ({
+                ...prev,
+                ...newStats,
+                // keep username if not specified in newStats
+                username: newStats.username || prev.username
+            }));
         };
 
         // Listen for proximity check
@@ -55,21 +140,75 @@ export default function HUD() {
             setTimeout(() => setErrorMsg(null), 3000);
         };
 
+        // Listen to incoming chat messages
+        const handleChatReceived = (msg: ChatMessage) => {
+            setChatMessages((prev) => [...prev.slice(-49), msg]); // Keep last 50
+        };
+
         EventBus.on('player-stats-changed', onStatsChanged);
         EventBus.on('near-facility', onNearFacility);
         EventBus.on('network-toast', onToast);
         EventBus.on('network-error', onError);
+        EventBus.on('chat-received', handleChatReceived);
 
         // Set initial Phaser active item
         EventBus.emit('set-active-item', activeItem);
+
+        // Keyboard Listener for Hotbar (1-9) and Enter to Chat
+        const handleKeyDown = (e: KeyboardEvent) => {
+            // Ignore if user is typing in chat or any other input
+            if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') {
+                return;
+            }
+
+            // Number keys 1-9
+            const keyNum = parseInt(e.key);
+            if (keyNum >= 1 && keyNum <= 9) {
+                e.preventDefault();
+                const slot = hotbarSlots.find(s => s.key === keyNum);
+                if (slot && !slot.disabled) {
+                    if (slot.isFood) {
+                        const count = getInventoryCount(slot.type);
+                        if (count > 0) {
+                            handleEatFood(slot.type);
+                        }
+                    } else {
+                        selectItem(slot.type);
+                    }
+                }
+            }
+
+            // Enter key opens chat input
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                chatInputRef.current?.focus();
+            }
+
+            // E key interacts if near a facility
+            if ((e.key === 'e' || e.key === 'E') && nearFacility) {
+                e.preventDefault();
+                openFacilityMenu();
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
 
         return () => {
             EventBus.off('player-stats-changed', onStatsChanged);
             EventBus.off('near-facility', onNearFacility);
             EventBus.off('network-toast', onToast);
             EventBus.off('network-error', onError);
+            EventBus.off('chat-received', handleChatReceived);
+            window.removeEventListener('keydown', handleKeyDown);
         };
-    }, [activeItem]);
+    }, [activeItem, nearFacility, stats.inventory]);
+
+    useEffect(() => {
+        // Scroll to bottom of chat
+        if (chatListRef.current) {
+            chatListRef.current.scrollTop = chatListRef.current.scrollHeight;
+        }
+    }, [chatMessages]);
 
     const selectItem = (itemType: string) => {
         setActiveItem(itemType);
@@ -86,169 +225,500 @@ export default function HUD() {
         }
     };
 
-    // Helper to count inventory items
+    const handleChatFocus = () => {
+        setIsChatFocused(true);
+        EventBus.emit('disable-player-input');
+    };
+
+    const handleChatBlur = () => {
+        setIsChatFocused(false);
+        EventBus.emit('enable-player-input');
+    };
+
+    const handleChatKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Escape') {
+            e.preventDefault();
+            chatInputRef.current?.blur();
+        }
+    };
+
+    const handleChatSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!chatInputText.trim()) {
+            chatInputRef.current?.blur();
+            return;
+        }
+
+        EventBus.emit('send-chat', chatInputText.trim());
+        setChatInputText('');
+        chatInputRef.current?.blur();
+    };
+
     const getInventoryCount = (itemType: string) => {
         return stats.inventory.find(i => i.itemType === itemType)?.count ?? 0;
     };
 
+    // Quests completion checking
+    const getQuestStatus = (questType: string) => {
+        switch (questType) {
+            case 'rice':
+                return getInventoryCount('crop_rice') >= 1;
+            case 'vegy':
+                return getInventoryCount('crop_vegetable') >= 1;
+            case 'apple':
+                return getInventoryCount('crop_fruit') >= 1;
+            case 'gold':
+                return stats.gold >= 500;
+            default:
+                return false;
+        }
+    };
+
     return (
-        <div className="absolute inset-0 pointer-events-none z-10 font-sans">
-            {/* Top-Left: Stats Bars */}
-            <div className="absolute top-4 left-4 bg-gray-900/90 border border-gray-700/50 p-4 rounded-xl shadow-2xl flex flex-col gap-3 pointer-events-auto min-w-[200px] backdrop-blur-md">
-                <div className="flex items-center justify-between text-white font-bold text-sm">
-                    <span className="text-amber-400">💰 Gold</span>
-                    <span className="text-amber-300 font-mono text-base">{stats.gold} G</span>
+        <div className="absolute inset-0 pointer-events-none z-10 font-pixel flex flex-col justify-between p-4 select-none">
+            
+            {/* ========================================================
+                TOP OVERLAY: STATUS BAR & ECONOMY
+               ======================================================== */}
+            <div className="flex justify-between items-start w-full">
+                
+                {/* Top-Left: Status Bar */}
+                <div className="flex flex-col gap-2 bg-gray-900/90 border-4 border-slate-900 p-4 rounded-xl shadow-2xl pointer-events-auto min-w-[240px] text-white retro-shadow">
+                    <div className="flex items-center gap-2 border-b border-gray-700 pb-1.5 mb-1">
+                        <User className="w-4 h-4 text-amber-400" />
+                        <span className="text-[11px] font-bold text-amber-400 tracking-wider uppercase truncate max-w-[150px]">
+                            {stats.username || 'Farmer'}
+                        </span>
+                    </div>
+
+                    {/* Energy Bar */}
+                    <div className="flex flex-col gap-1">
+                        <div className="flex justify-between text-[9px] text-amber-300 font-bold uppercase tracking-wider">
+                            <span className="flex items-center gap-1">⚡ Energy</span>
+                            <span>{stats.energy} / 100</span>
+                        </div>
+                        <div className="w-full bg-slate-950 h-5 border-2 border-slate-900 rounded overflow-hidden">
+                            <div 
+                                className="bg-yellow-400 h-full transition-all duration-300 border-r border-yellow-300"
+                                style={{ width: `${stats.energy}%` }}
+                            />
+                        </div>
+                    </div>
+
+                    {/* Hunger Bar */}
+                    <div className="flex flex-col gap-1">
+                        <div className="flex justify-between text-[9px] text-emerald-400 font-bold uppercase tracking-wider">
+                            <span className="flex items-center gap-1">🍖 Hunger</span>
+                            <span>{stats.hunger} / 100</span>
+                        </div>
+                        <div className="w-full bg-slate-950 h-5 border-2 border-slate-900 rounded overflow-hidden">
+                            <div 
+                                className="bg-emerald-500 h-full transition-all duration-300 border-r border-emerald-400"
+                                style={{ width: `${stats.hunger}%` }}
+                            />
+                        </div>
+                    </div>
                 </div>
 
-                {/* Energy Bar */}
-                <div className="flex flex-col gap-1">
-                    <div className="flex justify-between text-xs text-green-400 font-bold">
-                        <span>⚡ Energy</span>
-                        <span>{stats.energy} / 100</span>
+                {/* Top-Right: Economy */}
+                <div className="bg-gray-900/90 border-4 border-slate-900 p-4 rounded-xl shadow-2xl pointer-events-auto text-white retro-shadow flex items-center gap-3">
+                    <div className="bg-amber-500 p-1.5 rounded-lg border-2 border-slate-900 animate-pulse">
+                        <Coins className="w-5 h-5 text-gray-955" />
                     </div>
-                    <div className="w-full bg-gray-950 h-3.5 rounded-full overflow-hidden border border-gray-800">
-                        <div 
-                            className="bg-gradient-to-r from-green-500 to-emerald-400 h-full transition-all duration-300"
-                            style={{ width: `${stats.energy}%` }}
-                        />
+                    <div className="flex flex-col">
+                        <span className="text-[9px] text-gray-400 uppercase tracking-wider">Balance</span>
+                        <span className="text-sm font-bold text-amber-400 font-mono tracking-wide">
+                            {stats.gold.toLocaleString()} G
+                        </span>
                     </div>
-                </div>
-
-                {/* Hunger Bar */}
-                <div className="flex flex-col gap-1">
-                    <div className="flex justify-between text-xs text-orange-400 font-bold">
-                        <span>🍖 Hunger</span>
-                        <span>{stats.hunger} / 100</span>
-                    </div>
-                    <div className="w-full bg-gray-950 h-3.5 rounded-full overflow-hidden border border-gray-800">
-                        <div 
-                            className="bg-gradient-to-r from-orange-500 to-amber-400 h-full transition-all duration-300"
-                            style={{ width: `${stats.hunger}%` }}
-                        />
-                    </div>
-                </div>
-            </div>
-
-            {/* Bottom-Center: Hotbar */}
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-gray-900/95 border-2 border-gray-800/80 p-3 rounded-2xl shadow-2xl pointer-events-auto flex items-center gap-3 backdrop-blur-md">
-                {/* Hand/Harvest Slot */}
-                <button
-                    onClick={() => selectItem('harvest')}
-                    className={`relative w-14 h-14 rounded-xl flex flex-col items-center justify-center border-2 transition-all cursor-pointer ${
-                        activeItem === 'harvest' ? 'border-amber-500 bg-amber-500/20 text-white' : 'border-gray-700 bg-gray-950/60 text-gray-400 hover:border-gray-500'
-                    }`}
-                >
-                    <span className="text-lg">✋</span>
-                    <span className="text-[9px] font-bold mt-1">Harvest</span>
-                </button>
-
-                {/* Watering Can Slot */}
-                <button
-                    onClick={() => selectItem('watering_can')}
-                    className={`relative w-14 h-14 rounded-xl flex flex-col items-center justify-center border-2 transition-all cursor-pointer ${
-                        activeItem === 'watering_can' ? 'border-blue-500 bg-blue-500/20 text-white' : 'border-gray-700 bg-gray-950/60 text-gray-400 hover:border-gray-500'
-                    }`}
-                >
-                    <span className="text-lg">💧</span>
-                    <span className="text-[9px] font-bold mt-0.5">Water Lvl {stats.wateringCanLevel}</span>
-                    <div className="absolute bottom-1 left-2 right-2 h-1 bg-gray-800 rounded-full overflow-hidden">
-                        <div 
-                            className="bg-blue-400 h-full"
-                            style={{ width: `${stats.wateringCanDurability}%` }}
-                        />
-                    </div>
-                </button>
-
-                <div className="w-[1px] bg-gray-800 h-10 self-center" />
-
-                {/* Seeds Slots */}
-                <div className="flex gap-2">
-                    {[
-                        { type: 'seed_rice', name: 'Rice', image: '/padi.png' },
-                        { type: 'seed_vegetable', name: 'Vegy', emoji: '🥬' },
-                        { type: 'seed_fruit', name: 'Apple', emoji: '🍎' },
-                        { type: 'seed_golden_tree', name: 'Golden', emoji: '⭐' }
-                    ].map(seed => {
-                        const count = getInventoryCount(seed.type);
-                        return (
-                            <button
-                                key={seed.type}
-                                onClick={() => selectItem(seed.type)}
-                                disabled={count === 0}
-                                className={`relative w-14 h-14 rounded-xl flex flex-col items-center justify-center border-2 transition-all cursor-pointer ${
-                                    count === 0 ? 'opacity-50 border-gray-800/80 bg-gray-950/50 cursor-not-allowed text-gray-400' :
-                                    activeItem === seed.type ? 'border-emerald-500 bg-emerald-500/20 text-white' : 'border-gray-700 bg-gray-950/60 text-gray-300 hover:border-gray-500'
-                                }`}
-                            >
-                                {seed.image ? (
-                                    <img src={seed.image} className="w-5 h-5 object-contain" alt={seed.name} />
-                                ) : (
-                                    <span className="text-lg">{seed.emoji}</span>
-                                )}
-                                <span className="text-[9px] font-semibold mt-0.5">{seed.name}</span>
-                                <span className="absolute -top-1.5 -right-1.5 bg-gray-800 text-white border border-gray-600 text-[10px] w-5 h-5 flex items-center justify-center rounded-full font-bold">
-                                    {count}
-                                </span>
-                            </button>
-                        );
-                    })}
-                </div>
-
-                <div className="w-[1px] bg-gray-800 h-10 self-center" />
-
-                {/* Food Items (Interactable to eat) */}
-                <div className="flex gap-2">
-                    {[
-                        { type: 'food_bread', name: 'Bread', emoji: '🍞' },
-                        { type: 'food_rice_bowl', name: 'Bowl', emoji: '🍚' }
-                    ].map(food => {
-                        const count = getInventoryCount(food.type);
-                        return (
-                            <button
-                                key={food.type}
-                                onClick={() => count > 0 && handleEatFood(food.type)}
-                                disabled={count === 0}
-                                className={`relative w-14 h-14 rounded-xl flex flex-col items-center justify-center border-2 transition-all cursor-pointer ${
-                                    count === 0 ? 'opacity-50 border-gray-800/80 bg-gray-950/50 cursor-not-allowed text-gray-400' :
-                                    'border-amber-600 bg-amber-600/10 hover:bg-amber-600/30 text-gray-200'
-                                }`}
-                                title="Click to Eat!"
-                            >
-                                <span className="text-lg">{food.emoji}</span>
-                                <span className="text-[8px] font-bold text-amber-500 uppercase">Eat</span>
-                                <span className="absolute -top-1.5 -right-1.5 bg-gray-800 text-white border border-gray-600 text-[10px] w-5 h-5 flex items-center justify-center rounded-full font-bold">
-                                    {count}
-                                </span>
-                            </button>
-                        );
-                    })}
                 </div>
             </div>
 
-            {/* Middle Proximity Popup Prompt */}
+            {/* ========================================================
+                MIDDLE OVERLAY: PROXIMITY PROMPT
+               ======================================================== */}
             {nearFacility && (
-                <div className="absolute bottom-24 left-1/2 -translate-x-1/2 bg-amber-500 text-gray-950 font-bold px-6 py-2.5 rounded-full shadow-2xl animate-bounce pointer-events-auto border border-amber-300 flex items-center gap-3">
-                    <span>🏢 Proximity: {nearFacility.replace('_', ' ').toUpperCase()}</span>
-                    <button
-                        onClick={openFacilityMenu}
-                        className="bg-gray-900 text-white px-3 py-1 rounded-full text-xs font-bold hover:bg-black transition-colors cursor-pointer"
+                <div className="absolute top-[40%] left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-2 pointer-events-auto">
+                    <div className="bg-amber-500 border-4 border-slate-900 px-6 py-3 rounded-2xl shadow-2xl animate-bounce flex flex-col items-center gap-1">
+                        <span className="text-gray-950 font-bold text-xs uppercase tracking-wider text-center">
+                            🏠 {nearFacility.replace('_', ' ')}
+                        </span>
+                        <span className="text-slate-900 text-[10px] font-bold">
+                            Press [E] to Open Menu
+                        </span>
+                    </div>
+                </div>
+            )}
+
+            {/* ========================================================
+                BOTTOM OVERLAY: CHAT, HOTBAR, NAVIGATION
+               ======================================================== */}
+            <div className="grid grid-cols-12 gap-4 items-end w-full">
+                
+                {/* Bottom-Left: Chat Log */}
+                <div className="col-span-3 bg-gray-900/80 border-4 border-slate-900 p-3 rounded-xl shadow-2xl pointer-events-auto flex flex-col gap-2 h-56 text-white retro-shadow">
+                    <div className="text-[9px] text-gray-400 uppercase border-b border-gray-800 pb-1 flex items-center justify-between font-bold">
+                        <span>💬 Village Chat</span>
+                        <span className="text-amber-500 animate-pulse text-[8px]">[ONLINE]</span>
+                    </div>
+
+                    <div 
+                        ref={chatListRef}
+                        className="flex-1 overflow-y-auto pr-1 flex flex-col gap-1.5 text-[9px] select-text scrollbar-thin scrollbar-thumb-gray-800"
                     >
-                        Open Menu
-                    </button>
-                </div>
-            )}
+                        {chatMessages.length === 0 ? (
+                            <div className="text-gray-500 italic mt-auto">Welcome to Chat! Type or press Enter...</div>
+                        ) : (
+                            chatMessages.map((msg, index) => (
+                                <div key={index} className="leading-relaxed break-words">
+                                    <span className="text-amber-400 font-bold">{msg.username}: </span>
+                                    <span className="text-gray-200">{msg.text}</span>
+                                </div>
+                            ))
+                        )}
+                    </div>
 
-            {/* Error notifications */}
-            {errorMsg && (
-                <div className="absolute top-24 left-1/2 -translate-x-1/2 bg-red-600/90 text-white font-bold px-6 py-3 rounded-lg shadow-2xl border border-red-500 flex items-center gap-2 max-w-md">
-                    <span>❌ {errorMsg}</span>
+                    <form onSubmit={handleChatSubmit} className="flex gap-2 border-t border-gray-800 pt-2">
+                        <input
+                            ref={chatInputRef}
+                            type="text"
+                            value={chatInputText}
+                            onChange={(e) => setChatInputText(e.target.value)}
+                            onFocus={handleChatFocus}
+                            onBlur={handleChatBlur}
+                            onKeyDown={(e) => {
+                                e.stopPropagation();
+                                handleChatKeyDown(e);
+                            }}
+                            onKeyUp={(e) => {
+                                e.stopPropagation();
+                            }}
+                            placeholder="Press Enter..."
+                            maxLength={80}
+                            className="flex-1 px-2 py-1.5 bg-slate-950 border-2 border-slate-800 rounded text-[9px] text-white focus:outline-none focus:border-amber-500 placeholder-gray-600 font-mono"
+                        />
+                        <button 
+                            type="submit"
+                            className="p-1.5 bg-amber-600 hover:bg-amber-500 border-2 border-slate-900 text-white rounded cursor-pointer active:translate-y-[2px]"
+                        >
+                            <Send className="w-3.5 h-3.5" />
+                        </button>
+                    </form>
                 </div>
-            )}
 
-            {/* Success toasts */}
-            {toast && (
-                <div className="absolute top-24 left-1/2 -translate-x-1/2 bg-emerald-600/90 text-white font-bold px-6 py-3 rounded-lg shadow-2xl border border-emerald-500 flex items-center gap-2 max-w-md">
-                    <span>🌿 {toast.message}</span>
+                {/* Bottom-Center: Hotbar */}
+                <div className="col-span-6 flex justify-center">
+                    <div className="bg-gray-900/90 border-4 border-slate-900 p-3 rounded-2xl shadow-2xl pointer-events-auto flex items-center gap-2.5 backdrop-blur-md retro-shadow relative">
+                        {hotbarSlots.map((slot) => {
+                            const count = slot.disabled ? 0 : getInventoryCount(slot.type);
+                            const isActive = activeItem === slot.type;
+                            const isTool = slot.type === 'harvest' || slot.type === 'watering_can';
+                            const hasItem = isTool || count > 0;
+
+                            return (
+                                <button
+                                    key={slot.key}
+                                    onClick={() => {
+                                        if (slot.disabled) return;
+                                        if (slot.isFood) {
+                                            if (count > 0) handleEatFood(slot.type);
+                                        } else {
+                                            selectItem(slot.type);
+                                        }
+                                    }}
+                                    disabled={!hasItem && !slot.disabled}
+                                    className={`relative w-14 h-14 rounded-xl flex flex-col items-center justify-center border-4 transition-all cursor-pointer ${
+                                        slot.disabled ? 'border-gray-800 bg-gray-950/30 opacity-30 cursor-not-allowed' :
+                                        !hasItem ? 'opacity-40 border-gray-800 bg-gray-950/50 cursor-not-allowed' :
+                                        isActive ? 'border-amber-500 bg-amber-500/20 shadow-inner' :
+                                        'border-gray-700 bg-gray-950 hover:border-gray-500'
+                                    }`}
+                                >
+                                    {/* Slot Number */}
+                                    <span className="absolute top-0.5 left-1 text-[8px] font-bold text-gray-500 font-mono">
+                                        {slot.key}
+                                    </span>
+
+                                    {/* Item Icon */}
+                                    {slot.image ? (
+                                        <img src={slot.image} className="w-6 h-6 object-contain [image-rendering:pixelated]" alt={slot.name} />
+                                    ) : (
+                                        <span className="text-xl">{slot.emoji}</span>
+                                    )}
+
+                                    {/* Display label or details */}
+                                    {slot.type === 'watering_can' ? (
+                                        <div className="absolute bottom-1 left-1.5 right-1.5 h-1 bg-slate-900 rounded overflow-hidden">
+                                            <div 
+                                                className="bg-blue-400 h-full"
+                                                style={{ width: `${stats.wateringCanDurability}%` }}
+                                            />
+                                        </div>
+                                    ) : !slot.disabled && !isTool && count > 0 ? (
+                                        <span className="absolute -top-1.5 -right-1.5 bg-slate-900 text-white border-2 border-slate-700 text-[8px] w-5 h-5 flex items-center justify-center rounded-full font-bold font-mono">
+                                            {count}
+                                        </span>
+                                    ) : null}
+
+                                    {/* Food Eating Indicator */}
+                                    {slot.isFood && count > 0 && (
+                                        <span className="absolute bottom-0.5 text-[6px] text-amber-500 uppercase tracking-tight font-extrabold">
+                                            EAT
+                                        </span>
+                                    )}
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+
+                {/* Bottom-Right: Main Navigation */}
+                <div className="col-span-3 flex justify-end">
+                    <div className="bg-gray-900/90 border-4 border-slate-900 p-2.5 rounded-2xl shadow-2xl pointer-events-auto flex gap-3 retro-shadow">
+                        {/* Backpack Button */}
+                        <button
+                            onClick={() => setActiveModal(activeModal === 'inventory' ? null : 'inventory')}
+                            className={`p-3 border-4 border-slate-900 rounded-xl cursor-pointer text-white transition-all active:translate-y-[2px] ${
+                                activeModal === 'inventory' ? 'bg-amber-500 border-amber-600' : 'bg-slate-850 hover:bg-slate-800'
+                            }`}
+                            title="Backpack Inventory"
+                        >
+                            <Backpack className="w-5 h-5 text-amber-400" />
+                        </button>
+
+                        {/* Quests Button */}
+                        <button
+                            onClick={() => setActiveModal(activeModal === 'quests' ? null : 'quests')}
+                            className={`p-3 border-4 border-slate-900 rounded-xl cursor-pointer text-white transition-all active:translate-y-[2px] ${
+                                activeModal === 'quests' ? 'bg-amber-500 border-amber-600' : 'bg-slate-850 hover:bg-slate-800'
+                            }`}
+                            title="Quests Log"
+                        >
+                            <Award className="w-5 h-5 text-emerald-400" />
+                        </button>
+
+                        {/* Settings Button */}
+                        <button
+                            onClick={() => setActiveModal(activeModal === 'settings' ? null : 'settings')}
+                            className={`p-3 border-4 border-slate-900 rounded-xl cursor-pointer text-white transition-all active:translate-y-[2px] ${
+                                activeModal === 'settings' ? 'bg-amber-500 border-amber-600' : 'bg-slate-850 hover:bg-slate-800'
+                            }`}
+                            title="Game Settings"
+                        >
+                            <Settings className="w-5 h-5 text-blue-400" />
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            {/* ========================================================
+                FLOATING TOASTS / ERROR NOTIFICATION
+               ======================================================== */}
+            <div className="absolute top-24 left-1/2 -translate-x-1/2 flex flex-col gap-2 items-center pointer-events-auto">
+                {errorMsg && (
+                    <div className="bg-red-600/90 text-white font-bold px-5 py-2.5 rounded-lg shadow-2xl border-4 border-slate-900 flex items-center gap-2 max-w-md animate-scale-in text-[10px]">
+                        <span>❌ {errorMsg}</span>
+                    </div>
+                )}
+                {toast && (
+                    <div className="bg-emerald-600/90 text-white font-bold px-5 py-2.5 rounded-lg shadow-2xl border-4 border-slate-900 flex items-center gap-2 max-w-md animate-scale-in text-[10px]">
+                        <span>🌿 {toast.message}</span>
+                    </div>
+                )}
+            </div>
+
+            {/* ========================================================
+                CENTER MODALS (INVENTORY, QUESTS, SETTINGS)
+               ======================================================== */}
+            {activeModal && (
+                <div className="absolute inset-0 bg-black/70 backdrop-blur-sm pointer-events-auto z-50 flex items-center justify-center">
+                    
+                    {/* --- 1. BACKPACK INVENTORY MODAL --- */}
+                    {activeModal === 'inventory' && (
+                        <div className="bg-gray-900 border-4 border-slate-900 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col p-6 text-white retro-shadow relative animate-scale-in">
+                            <button 
+                                onClick={() => setActiveModal(null)}
+                                className="absolute top-4 right-4 text-gray-400 hover:text-white cursor-pointer"
+                            >
+                                <X className="w-6 h-6" />
+                            </button>
+
+                            <h2 className="text-base font-bold text-amber-400 uppercase tracking-widest mb-4 border-b-4 border-gray-800 pb-2 flex items-center gap-2">
+                                <Backpack className="w-5 h-5" /> Backpack Inventory
+                            </h2>
+
+                            {/* 24 slots Grid (6 columns x 4 rows) */}
+                            <div className="grid grid-cols-6 gap-3 mb-4">
+                                {Array.from({ length: 24 }).map((_, index) => {
+                                    // Map items to the grid
+                                    const item = stats.inventory[index];
+                                    const meta = item ? getItemMetadata(item.itemType) : null;
+                                    const isFood = meta?.type === 'food';
+
+                                    return (
+                                        <div
+                                            key={index}
+                                            onMouseEnter={() => item && setHoveredItem(item.itemType)}
+                                            onMouseLeave={() => setHoveredItem(null)}
+                                            onClick={() => {
+                                                if (item && isFood) {
+                                                    handleEatFood(item.itemType);
+                                                }
+                                            }}
+                                            className={`w-[60px] h-[60px] bg-slate-950 border-4 rounded-xl flex items-center justify-center relative cursor-pointer ${
+                                                item ? 'border-slate-800 hover:border-amber-500' : 'border-slate-800/40 cursor-default'
+                                            }`}
+                                        >
+                                            {item && meta && (
+                                                <>
+                                                    {meta.image ? (
+                                                        <img src={meta.image} className="w-8 h-8 object-contain [image-rendering:pixelated]" alt={meta.name} />
+                                                    ) : (
+                                                        <span className="text-2xl">{meta.emoji}</span>
+                                                    )}
+                                                    <span className="absolute bottom-0.5 right-1 bg-slate-900 border border-slate-700 text-[8px] px-1 rounded font-bold font-mono">
+                                                        {item.count}
+                                                    </span>
+
+                                                    {isFood && (
+                                                        <span className="absolute top-0.5 right-0.5 text-[5px] text-amber-500 font-extrabold uppercase leading-none">
+                                                            EAT
+                                                        </span>
+                                                    )}
+                                                </>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+
+                            {/* Hover description pane */}
+                            <div className="bg-slate-955 border-4 border-slate-800 p-3 rounded-xl min-h-[70px] text-[10px] text-gray-300">
+                                {hoveredItem ? (
+                                    <div>
+                                        <h4 className="font-bold text-amber-400 text-xs mb-0.5">
+                                            {getItemMetadata(hoveredItem).name}
+                                        </h4>
+                                        <p>{getItemMetadata(hoveredItem).desc}</p>
+                                    </div>
+                                ) : (
+                                    <p className="text-gray-550 italic text-center pt-2">Hover over an item for details</p>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* --- 2. QUESTS MODAL --- */}
+                    {activeModal === 'quests' && (
+                        <div className="bg-gray-900 border-4 border-slate-900 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col p-6 text-white retro-shadow relative animate-scale-in">
+                            <button 
+                                onClick={() => setActiveModal(null)}
+                                className="absolute top-4 right-4 text-gray-400 hover:text-white cursor-pointer"
+                            >
+                                <X className="w-6 h-6" />
+                            </button>
+
+                            <h2 className="text-base font-bold text-emerald-400 uppercase tracking-widest mb-4 border-b-4 border-gray-800 pb-2 flex items-center gap-2">
+                                <Award className="w-5 h-5" /> Active Quests
+                            </h2>
+
+                            <div className="flex flex-col gap-4 max-h-80 overflow-y-auto">
+                                {[
+                                    { key: 'rice', title: 'Plant Rice', desc: 'Harvest 1 Rice Crop.', icon: '🌾' },
+                                    { key: 'vegy', title: 'Eat your Vegy', desc: 'Harvest 1 Vegetable Crop.', icon: '🥬' },
+                                    { key: 'apple', title: 'Apple Season', desc: 'Harvest 1 Apple.', icon: '🍎' },
+                                    { key: 'gold', title: 'Wealth Accumulator', desc: 'Acquire 500 gold.', icon: '💰' }
+                                ].map(quest => {
+                                    const isDone = getQuestStatus(quest.key);
+                                    return (
+                                        <div key={quest.key} className="bg-slate-950 border-4 border-slate-800 p-3.5 rounded-xl flex items-center justify-between">
+                                            <div className="flex items-center gap-3">
+                                                <span className="text-2xl">{quest.icon}</span>
+                                                <div className="flex flex-col gap-0.5">
+                                                    <h4 className={`text-xs font-bold ${isDone ? 'text-gray-500 line-through' : 'text-gray-200'}`}>
+                                                        {quest.title}
+                                                    </h4>
+                                                    <p className="text-[9px] text-gray-450">{quest.desc}</p>
+                                                </div>
+                                            </div>
+
+                                            {isDone ? (
+                                                <div className="flex items-center gap-1 bg-emerald-500/10 border-2 border-emerald-500 text-emerald-400 px-2.5 py-1 rounded text-[8px] font-bold">
+                                                    <CheckCircle className="w-3 h-3" /> Done
+                                                </div>
+                                            ) : (
+                                                <div className="bg-amber-500/10 border-2 border-amber-500 text-amber-400 px-2.5 py-1 rounded text-[8px] font-bold">
+                                                    Active
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* --- 3. SETTINGS MODAL --- */}
+                    {activeModal === 'settings' && (
+                        <div className="bg-gray-900 border-4 border-slate-900 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col p-6 text-white retro-shadow relative animate-scale-in">
+                            <button 
+                                onClick={() => setActiveModal(null)}
+                                className="absolute top-4 right-4 text-gray-400 hover:text-white cursor-pointer"
+                            >
+                                <X className="w-6 h-6" />
+                            </button>
+
+                            <h2 className="text-base font-bold text-blue-400 uppercase tracking-widest mb-4 border-b-4 border-gray-800 pb-2 flex items-center gap-2">
+                                <Settings className="w-5 h-5" /> Settings & Controls
+                            </h2>
+
+                            <div className="flex flex-col gap-4 text-[10px] text-gray-300">
+                                {/* Sound Settings */}
+                                <div className="bg-slate-955 border-4 border-slate-800 p-4 rounded-xl flex items-center justify-between">
+                                    <div className="flex flex-col gap-0.5">
+                                        <h4 className="font-bold text-xs text-white">Audio Settings</h4>
+                                        <p className="text-[8px] text-gray-500">Toggle game music and sounds</p>
+                                    </div>
+                                    <button
+                                        onClick={() => setSoundEnabled(!soundEnabled)}
+                                        className="p-2 bg-slate-850 hover:bg-slate-800 border-2 border-slate-700 text-white rounded cursor-pointer"
+                                    >
+                                        {soundEnabled ? <Volume2 className="w-5 h-5 text-emerald-400" /> : <VolumeX className="w-5 h-5 text-red-500" />}
+                                    </button>
+                                </div>
+
+                                {/* Controls panel */}
+                                <div className="bg-slate-950 border-4 border-slate-800 p-4 rounded-xl flex flex-col gap-3">
+                                    <h4 className="font-bold text-xs text-amber-400 border-b border-gray-800 pb-1 flex items-center gap-1.5">
+                                        <Keyboard className="w-4 h-4" /> Keyboard Controls
+                                    </h4>
+                                    
+                                    <div className="flex flex-col gap-2 font-mono">
+                                        <div className="flex justify-between border-b border-gray-900 pb-1">
+                                            <span className="text-gray-450">Movement:</span>
+                                            <span className="text-white font-bold">WASD / Arrow Keys</span>
+                                        </div>
+                                        <div className="flex justify-between border-b border-gray-900 pb-1">
+                                            <span className="text-gray-450">Select Hotbar:</span>
+                                            <span className="text-white font-bold">Keys 1 - 8</span>
+                                        </div>
+                                        <div className="flex justify-between border-b border-gray-900 pb-1">
+                                            <span className="text-gray-450">Interact:</span>
+                                            <span className="text-white font-bold">Key [E]</span>
+                                        </div>
+                                        <div className="flex justify-between pb-1">
+                                            <span className="text-gray-450">Open Chat:</span>
+                                            <span className="text-white font-bold">Key [Enter]</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="text-center text-[8px] text-gray-550 border-t border-gray-800 pt-2 font-mono">
+                                    Helge Village Web3 MMO v0.2.0 • Built on Solana
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
         </div>

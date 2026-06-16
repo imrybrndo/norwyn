@@ -67,10 +67,16 @@ export class Player extends Phaser.GameObjects.Container {
         // Hook event listeners to disable controls during chat typing
         const handleDisableInput = () => {
             this.inputEnabled = false;
+            if (scene.input && scene.input.keyboard) {
+                scene.input.keyboard.enabled = false;
+            }
         };
 
         const handleEnableInput = () => {
             this.inputEnabled = true;
+            if (scene.input && scene.input.keyboard) {
+                scene.input.keyboard.enabled = true;
+            }
         };
 
         EventBus.on('disable-player-input', handleDisableInput);

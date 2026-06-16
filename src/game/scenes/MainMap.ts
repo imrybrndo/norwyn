@@ -121,7 +121,7 @@ export class MainMap extends Phaser.Scene {
             color: '#ffffff',
             backgroundColor: '#00000066',
             padding: { x: 4, y: 2 }
-        }).setOrigin(0.5).setScale(0.25).setDepth(3);
+        }).setOrigin(0.5).setScale(0.25).setDepth(6);
 
         this.cropObjects.set(tileKey, { soil, crop: cropSprite, timer });
     }
@@ -286,6 +286,7 @@ export class MainMap extends Phaser.Scene {
 
     emitLocalStats() {
         EventBus.emit('player-stats-changed', {
+            username: this.registry.get('username') || 'Farmer',
             gold: this.localStats.gold,
             energy: this.localStats.energy,
             hunger: this.localStats.hunger,
@@ -569,6 +570,7 @@ export class MainMap extends Phaser.Scene {
 
         // 5. Spawn local player
         this.player = new Player(this, 240, 240, username, clothesIndex);
+        this.player.setDepth(5);
         this.physics.add.collider(this.player, this.environmentLayer);
         this.physics.add.collider(this.player, this.groundLayer);
         if (this.groundDetailLayer) {
@@ -784,6 +786,7 @@ export class MainMap extends Phaser.Scene {
                     if (sessionId === room.sessionId) {
                         // Notify React UI about self player stats change
                         EventBus.emit('player-stats-changed', {
+                            username: player.username || 'Farmer',
                             gold: player.gold,
                             energy: player.energy,
                             hunger: player.hunger,
@@ -809,6 +812,7 @@ export class MainMap extends Phaser.Scene {
                 if (sessionId === room.sessionId) return; // Skip spawning other player logic here
 
                 const otherPlayer = new OtherPlayer(this, player.x, player.y, player.username, player.clothesIndex);
+                otherPlayer.setDepth(5);
                 this.otherPlayers.set(sessionId, otherPlayer);
             });
 

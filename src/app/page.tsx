@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import GameLoader from '../components/GameLoader';
-import ChatBox from '../components/ui/ChatBox';
 import HUD from '../components/ui/HUD';
 import FacilitiesModal from '../components/ui/FacilitiesModal';
 import LandingHero from '../components/ui/LandingHero';
@@ -159,20 +158,9 @@ export default function Home() {
                             isOnline={gameState.isOnline}
                         />
                     </div>
-                    {/* Overlay React UI HUD, Facilities Shop and ChatBox */}
+                    {/* Overlay React UI HUD and Facilities Shop */}
                     <HUD />
                     <FacilitiesModal />
-                    <ChatBox />
-
-                    {/* Floating Info Panel */}
-                    <div className="absolute top-4 right-4 bg-gray-900/85 border-2 border-amber-600 rounded-lg p-4 shadow-2xl z-10 font-mono text-white text-xs max-w-xs select-none">
-                        <h3 className="text-amber-400 font-bold uppercase mb-2 border-b border-gray-700 pb-1">Control Instructions</h3>
-                        <ul className="flex flex-col gap-1.5 text-gray-300">
-                            <li><span className="text-amber-500 font-bold">Movement:</span> WASD / Arrow Keys</li>
-                            <li><span className="text-amber-500 font-bold">Chat:</span> Press Enter to chat</li>
-                            <li><span className="text-amber-500 font-bold">Web3:</span> Profile & Wallet synchronized</li>
-                        </ul>
-                    </div>
                 </>
             )}
         </main>
