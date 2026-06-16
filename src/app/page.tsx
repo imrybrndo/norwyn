@@ -9,7 +9,7 @@ import FacilitiesModal from '../components/ui/FacilitiesModal';
 import LandingHero from '../components/ui/LandingHero';
 import OnboardingFlow from '../components/ui/OnboardingFlow';
 import Navbar from '../components/ui/Navbar';
-import HowToPlay from '../components/ui/HowToPlay';
+import FeaturesBento from '../components/ui/FeaturesBento';
 
 export default function Home() {
     const { connected, publicKey } = useWallet();
@@ -122,9 +122,9 @@ export default function Home() {
     };
 
     return (
-        <main className="relative w-screen h-screen bg-gray-950 overflow-hidden text-white font-mono">
+        <main className="relative w-screen h-screen bg-gray-950 overflow-hidden text-slate-850 font-sans">
             {!gameState.inGame ? (
-                <div className="absolute inset-0 z-20 bg-gray-950 overflow-y-auto">
+                <div className="absolute inset-0 z-20 cozy-pasture-gradient overflow-y-auto">
                     {showOnboarding ? (
                         <div className="min-h-screen flex items-center justify-center py-12 px-4">
                             <OnboardingFlow 
@@ -142,8 +142,8 @@ export default function Home() {
                                 onStartOnboarding={handleStartOnboarding}
                                 onEnterGame={handleEnterGame}
                             />
-                            <HowToPlay />
-                            <footer className="w-full border-t border-gray-900 py-8 text-center text-xs text-gray-500 font-mono mt-auto">
+                            <FeaturesBento />
+                            <footer className="w-full border-t border-slate-200 py-8 text-center text-xs text-slate-450 font-bold mt-auto">
                                 &copy; {new Date().getFullYear()} Helge Village. All Rights Reserved. Built on Solana.
                             </footer>
                         </div>

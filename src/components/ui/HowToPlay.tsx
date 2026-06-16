@@ -2,54 +2,36 @@
 
 import React from 'react';
 import { motion, Variants } from 'framer-motion';
-import { Sprout, Axe, Fish, Wallet, ArrowUpRight, TrendingUp } from 'lucide-react';
+import { Sprout, Axe, Palette, Coins, Info } from 'lucide-react';
 
 export default function HowToPlay() {
     const cards = [
         {
             icon: Sprout,
-            title: 'Agriculture (Pertanian)',
-            description: 'Plant seeds, water your crops daily, and watch them grow. Harvest ripe crops to earn gold or consume them for energy and health.',
-            badge: 'Farmer Special',
-            gradient: 'from-emerald-500/10 via-emerald-500/5 to-transparent',
-            border: 'border-emerald-500/30 hover:border-emerald-500/60',
-            iconColor: 'text-emerald-400',
+            title: 'Plant & Harvest',
+            description: 'Grow 11 different types of crops through 5 detailed growth stages. Water daily and harvest fresh produce to sell or use.',
+            badge: 'Farming',
+            gradient: 'from-emerald-100/30 to-transparent',
+            border: 'border-emerald-200 hover:border-emerald-400',
+            iconColor: 'text-emerald-600 bg-emerald-100',
         },
         {
             icon: Axe,
-            title: 'Forestry (Kehutanan)',
-            description: 'Use your Axe to clear trees around the map. Collect wood, craft materials, and complete high-value contracts.',
-            badge: 'Woodcutter Special',
-            gradient: 'from-amber-500/10 via-amber-500/5 to-transparent',
-            border: 'border-amber-500/30 hover:border-amber-500/60',
-            iconColor: 'text-amber-400',
+            title: 'Action & Professions',
+            description: 'Engage in fishing, woodcutting, or mining. Master over 20 unique character actions to gather valuable resources.',
+            badge: 'Gathering',
+            gradient: 'from-amber-100/30 to-transparent',
+            border: 'border-amber-200 hover:border-amber-400',
+            iconColor: 'text-amber-600 bg-amber-100',
         },
         {
-            icon: Fish,
-            title: 'Deep Water Fishing',
-            description: 'Cast your line in local waters. Catch different fish species ranging from common mackerels to legendary golden koi.',
-            badge: 'Fisher Special',
-            gradient: 'from-blue-500/10 via-blue-500/5 to-transparent',
-            border: 'border-blue-500/30 hover:border-blue-500/60',
-            iconColor: 'text-blue-400',
-        },
-        {
-            icon: Wallet,
-            title: 'Web3 Economy Integration',
-            description: 'Connect your Solana wallet to synchronize inventory, profile details, and save progress directly to the blockchain securely.',
-            badge: 'Solana Web3',
-            gradient: 'from-purple-500/10 via-purple-500/5 to-transparent',
-            border: 'border-purple-500/30 hover:border-purple-500/60',
-            iconColor: 'text-purple-400',
-        },
-        {
-            icon: TrendingUp,
-            title: 'Dynamic Local Shop',
-            description: 'Buy seeds and sell harvested resources. Shop prices fluctuate dynamically based on total supply and active players.',
-            badge: 'Marketplace',
-            gradient: 'from-pink-500/10 via-pink-500/5 to-transparent',
-            border: 'border-pink-500/30 hover:border-pink-500/60',
-            iconColor: 'text-pink-400',
+            icon: Palette,
+            title: 'Customize Character',
+            description: 'Express yourself with 7 animated hairstyles and infinite color adjustments to make your villager truly unique.',
+            badge: 'Cosmetics',
+            gradient: 'from-pink-100/30 to-transparent',
+            border: 'border-pink-200 hover:border-pink-400',
+            iconColor: 'text-pink-600 bg-pink-100',
         },
     ];
 
@@ -75,7 +57,7 @@ export default function HowToPlay() {
     };
 
     return (
-        <section id="how-to-play" className="w-full max-w-7xl mx-auto px-6 py-24 relative select-none">
+        <section id="features" className="w-full max-w-7xl mx-auto px-6 py-16 relative select-none">
             {/* Heading */}
             <div className="text-center mb-16 relative z-10">
                 <motion.h2 
@@ -83,7 +65,7 @@ export default function HowToPlay() {
                     whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true }}
                     transition={{ duration: 0.6 }}
-                    className="text-3xl md:text-5xl font-black uppercase tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-yellow-300 font-mono"
+                    className="text-2xl md:text-4xl font-pixel text-slate-800 tracking-tight"
                 >
                     Discover Helge Village
                 </motion.h2>
@@ -92,60 +74,90 @@ export default function HowToPlay() {
                     whileInView={{ opacity: 1 }}
                     viewport={{ once: true }}
                     transition={{ delay: 0.2, duration: 0.6 }}
-                    className="text-gray-400 max-w-lg mx-auto text-xs md:text-sm mt-3 font-mono"
+                    className="text-slate-500 max-w-xl mx-auto text-sm md:text-base mt-4 font-semibold"
                 >
-                    A beautiful, gamified world where retro 2D farming simulator meets secure Solana Web3 technology.
+                    A cozy, gamified pasture where retro pixel art meets secure Solana Web3 technology.
                 </motion.p>
             </div>
 
-            {/* Bento Grid */}
+            {/* Features Bento Grid */}
             <motion.div 
                 variants={containerVariants}
                 initial="hidden"
                 whileInView="visible"
                 viewport={{ once: true, margin: '-100px' }}
-                className="grid grid-cols-1 md:grid-cols-6 gap-6 relative z-10"
+                className="grid grid-cols-1 md:grid-cols-3 gap-8 relative z-10 mb-12"
             >
                 {cards.map((card, i) => {
                     const CardIcon = card.icon;
-                    // Make some cards wider to create the Bento Grid effect
-                    const colSpan = i === 3 || i === 4 ? 'md:col-span-3' : 'md:col-span-2';
 
                     return (
                         <motion.div
                             key={i}
                             variants={cardVariants}
-                            whileHover={{ y: -8, scale: 1.01 }}
-                            className={`${colSpan} bg-gray-900/40 backdrop-blur-sm border-2 ${card.border} rounded-2xl p-6 flex flex-col justify-between group shadow-xl hover:shadow-[0_15px_30px_rgba(0,0,0,0.4)] transition-all duration-300 relative overflow-hidden`}
+                            whileHover={{ y: -6 }}
+                            className={`bg-white/80 backdrop-blur-md border-4 ${card.border} rounded-3xl p-8 flex flex-col justify-between group bento-card-shadow hover:bento-card-shadow-hover transition-all duration-300 relative overflow-hidden`}
                         >
                             {/* Inner Background Glow */}
-                            <div className={`absolute inset-0 bg-gradient-to-br ${card.gradient} opacity-40 pointer-events-none group-hover:opacity-60 transition-opacity`} />
+                            <div className={`absolute inset-0 bg-gradient-to-br ${card.gradient} opacity-50 pointer-events-none`} />
                             
-                            <div>
+                            <div className="relative z-10">
                                 <div className="flex justify-between items-start mb-6">
-                                    <div className={`p-3 bg-gray-950/80 rounded-xl border border-gray-800 ${card.iconColor} group-hover:scale-110 transition-transform duration-300 shadow-inner`}>
+                                    <div className={`p-3.5 rounded-2xl border-2 border-slate-100 ${card.iconColor} group-hover:scale-105 transition-transform duration-300`}>
                                         <CardIcon className="w-6 h-6" />
                                     </div>
-                                    <span className="text-[10px] uppercase font-bold tracking-widest text-amber-500 bg-amber-500/10 px-2.5 py-1 rounded-full border border-amber-500/20">
+                                    <span className="text-[10px] uppercase font-extrabold tracking-widest text-slate-500 bg-slate-100 px-3 py-1 rounded-full border-2 border-slate-100">
                                         {card.badge}
                                     </span>
                                 </div>
 
-                                <h3 className="font-mono font-bold text-lg text-white mb-2 group-hover:text-amber-300 transition-colors">
+                                <h3 className="font-pixel text-sm text-slate-800 mb-3 group-hover:text-emerald-700 transition-colors">
                                     {card.title}
                                 </h3>
-                                <p className="font-mono text-xs text-gray-400 leading-relaxed">
+                                <p className="font-sans text-sm font-semibold text-slate-600 leading-relaxed">
                                     {card.description}
                                 </p>
-                            </div>
-
-                            <div className="mt-8 flex items-center justify-between text-gray-500 group-hover:text-amber-400 transition-colors text-xs font-mono">
-                                <span>Learn more</span>
-                                <ArrowUpRight className="w-4 h-4 transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
                             </div>
                         </motion.div>
                     );
                 })}
+            </motion.div>
+
+            {/* Web3 & Tokenomics Disclaimer Section */}
+            <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.6, delay: 0.1 }}
+                className="relative z-10 bg-white/90 backdrop-blur-md border-4 border-slate-100 rounded-3xl p-8 md:p-10 bento-card-shadow"
+            >
+                <div className="flex flex-col md:flex-row gap-6 md:gap-10 items-start">
+                    <div className="p-4 bg-orange-50 border-2 border-orange-200 rounded-2xl text-orange-600 shrink-0">
+                        <Coins className="w-8 h-8" />
+                    </div>
+                    
+                    <div className="space-y-4">
+                        <h3 className="font-pixel text-sm md:text-base text-slate-800 flex items-center gap-2">
+                            Web3 & Tokenomics Integration
+                        </h3>
+                        
+                        <div className="space-y-3 font-sans text-sm font-semibold text-slate-600 leading-relaxed">
+                            <p>
+                                Helge Village features an active Web3 economy utilizing crypto assets (SPL Tokens on Solana) to coordinate in-game progression and reward systems.
+                            </p>
+                            {/* <p className="border-l-4 border-orange-400 pl-4 py-1 bg-orange-50/50 rounded-r-xl">
+                                <strong className="text-slate-800">Important:</strong> In compliance with our creator assets license, there are absolutely <span className="text-orange-600 underline decoration-2">NO sales of visual assets, character skins, or environment designs as NFTs</span>. Everything is earned through gameplay!
+                            </p> */}
+                            
+                            <div className="pt-4 border-t-2 border-slate-100 flex items-start gap-2 text-xs text-slate-500 font-bold">
+                                <Info className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
+                                <p>
+                                    Helge Village is entirely free to play. Content in this game is Not Financial Advice (NFA). We encourage all players to prioritize relaxing and casual gameplay.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </motion.div>
         </section>
     );
