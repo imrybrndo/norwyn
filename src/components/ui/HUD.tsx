@@ -28,10 +28,14 @@ interface PlayerStats {
     gold: number;
     energy: number;
     hunger: number;
+    level: number;
+    exp: number;
     wateringCanLevel: number;
     wateringCanDurability: number;
     inventory: InventoryItem[];
+    lastClaimedQuests?: Record<string, number>;
     username?: string;
+    isSleeping?: boolean;
 }
 
 interface ChatMessage {
@@ -74,9 +78,12 @@ export default function HUD() {
         gold: 100,
         energy: 100,
         hunger: 100,
+        level: 1,
+        exp: 0,
         wateringCanLevel: 1,
         wateringCanDurability: 100,
         inventory: [],
+        lastClaimedQuests: {},
         username: 'Farmer'
     });
 
@@ -98,6 +105,9 @@ export default function HUD() {
 
     // Hover Tooltip State
     const [hoveredItem, setHoveredItem] = useState<string | null>(null);
+
+    // Online Count
+    const [onlineCount, setOnlineCount] = useState(1);
 
     // Define 9 slots items
     const hotbarSlots = [
@@ -145,17 +155,26 @@ export default function HUD() {
             setChatMessages((prev) => [...prev.slice(-49), msg]); // Keep last 50
         };
 
+        const handleOnlineCount = (count: number) => {
+            setOnlineCount(count);
+        };
+
         EventBus.on('player-stats-changed', onStatsChanged);
         EventBus.on('near-facility', onNearFacility);
         EventBus.on('network-toast', onToast);
         EventBus.on('network-error', onError);
         EventBus.on('chat-received', handleChatReceived);
+        EventBus.on('online-count-changed', handleOnlineCount);
 
         // Set initial Phaser active item
         EventBus.emit('set-active-item', activeItem);
 
         // Keyboard Listener for Hotbar (1-9) and Enter to Chat
         const handleKeyDown = (e: KeyboardEvent) => {
+            // Ignore if sleeping
+            if (stats.isSleeping) {
+                return;
+            }
             // Ignore if user is typing in chat or any other input
             if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') {
                 return;
@@ -199,9 +218,24 @@ export default function HUD() {
             EventBus.off('network-toast', onToast);
             EventBus.off('network-error', onError);
             EventBus.off('chat-received', handleChatReceived);
+            EventBus.off('online-count-changed', handleOnlineCount);
             window.removeEventListener('keydown', handleKeyDown);
         };
     }, [activeItem, nearFacility, stats.inventory]);
+
+    useEffect(() => {
+        EventBus.emit('toggle-sound', soundEnabled);
+
+        const handleRequestSoundStatus = () => {
+            EventBus.emit('toggle-sound', soundEnabled);
+        };
+
+        EventBus.on('request-sound-status', handleRequestSoundStatus);
+
+        return () => {
+            EventBus.off('request-sound-status', handleRequestSoundStatus);
+        };
+    }, [soundEnabled]);
 
     useEffect(() => {
         // Scroll to bottom of chat
@@ -260,18 +294,30 @@ export default function HUD() {
 
     // Quests completion checking
     const getQuestStatus = (questType: string) => {
+        const lastClaimed = stats.lastClaimedQuests?.[questType] || 0;
+        const ONE_DAY = 24 * 60 * 60 * 1000;
+        if (Date.now() - lastClaimed < ONE_DAY) return 'claimed';
+
         switch (questType) {
             case 'rice':
-                return getInventoryCount('crop_rice') >= 1;
+                return getInventoryCount('crop_rice') >= 1 ? 'ready' : 'active';
             case 'vegy':
-                return getInventoryCount('crop_vegetable') >= 1;
+                return getInventoryCount('crop_vegetable') >= 1 ? 'ready' : 'active';
             case 'apple':
-                return getInventoryCount('crop_fruit') >= 1;
+                return getInventoryCount('crop_fruit') >= 1 ? 'ready' : 'active';
             case 'gold':
-                return stats.gold >= 500;
+                return stats.gold >= 500 ? 'ready' : 'active';
             default:
-                return false;
+                return 'active';
         }
+    };
+
+    const handleClaimQuest = (questType: string) => {
+        EventBus.emit('send-room-message', { type: 'claimQuest', payload: { questId: questType } });
+    };
+
+    const handleLogout = () => {
+        window.location.reload(); // simple logout for now
     };
 
     return (
@@ -287,8 +333,22 @@ export default function HUD() {
                     <div className="flex items-center gap-2 border-b border-gray-700 pb-1.5 mb-1">
                         <User className="w-4 h-4 text-amber-400" />
                         <span className="text-[11px] font-bold text-amber-400 tracking-wider uppercase truncate max-w-[150px]">
-                            {stats.username || 'Farmer'}
+                            Lv.{stats.level} {stats.username || 'Farmer'}
                         </span>
+                    </div>
+
+                    {/* EXP Bar */}
+                    <div className="flex flex-col gap-1">
+                        <div className="flex justify-between text-[9px] text-blue-400 font-bold uppercase tracking-wider">
+                            <span className="flex items-center gap-1">⭐ EXP</span>
+                            <span>{stats.exp} / {stats.level * 100}</span>
+                        </div>
+                        <div className="w-full bg-slate-950 h-3 border-2 border-slate-900 rounded overflow-hidden">
+                            <div 
+                                className="bg-blue-500 h-full transition-all duration-300 border-r border-blue-400"
+                                style={{ width: `${Math.min(100, (stats.exp / (stats.level * 100)) * 100)}%` }}
+                            />
+                        </div>
                     </div>
 
                     {/* Energy Bar */}
@@ -359,7 +419,7 @@ export default function HUD() {
                 <div className="col-span-3 bg-gray-900/80 border-4 border-slate-900 p-3 rounded-xl shadow-2xl pointer-events-auto flex flex-col gap-2 h-56 text-white retro-shadow">
                     <div className="text-[9px] text-gray-400 uppercase border-b border-gray-800 pb-1 flex items-center justify-between font-bold">
                         <span>💬 Village Chat</span>
-                        <span className="text-amber-500 animate-pulse text-[8px]">[ONLINE]</span>
+                        <span className="text-amber-500 animate-pulse text-[8px]">[ONLINE: {onlineCount}]</span>
                     </div>
 
                     <div 
@@ -624,28 +684,39 @@ export default function HUD() {
 
                             <div className="flex flex-col gap-4 max-h-80 overflow-y-auto">
                                 {[
-                                    { key: 'rice', title: 'Plant Rice', desc: 'Harvest 1 Rice Crop.', icon: '🌾' },
+                                    { key: 'rice', title: 'Plant Rice', desc: 'Harvest 1 Rice Crop.', iconImg: '/padi.png' },
                                     { key: 'vegy', title: 'Eat your Vegy', desc: 'Harvest 1 Vegetable Crop.', icon: '🥬' },
                                     { key: 'apple', title: 'Apple Season', desc: 'Harvest 1 Apple.', icon: '🍎' },
                                     { key: 'gold', title: 'Wealth Accumulator', desc: 'Acquire 500 gold.', icon: '💰' }
                                 ].map(quest => {
-                                    const isDone = getQuestStatus(quest.key);
+                                    const status = getQuestStatus(quest.key);
                                     return (
                                         <div key={quest.key} className="bg-slate-950 border-4 border-slate-800 p-3.5 rounded-xl flex items-center justify-between">
                                             <div className="flex items-center gap-3">
-                                                <span className="text-2xl">{quest.icon}</span>
+                                                {quest.iconImg ? (
+                                                    <img src={quest.iconImg} alt={quest.title} className="w-8 h-8 object-contain [image-rendering:pixelated]" />
+                                                ) : (
+                                                    <span className="text-2xl">{quest.icon}</span>
+                                                )}
                                                 <div className="flex flex-col gap-0.5">
-                                                    <h4 className={`text-xs font-bold ${isDone ? 'text-gray-500 line-through' : 'text-gray-200'}`}>
+                                                    <h4 className={`text-xs font-bold ${status === 'claimed' ? 'text-gray-500 line-through' : 'text-gray-200'}`}>
                                                         {quest.title}
                                                     </h4>
                                                     <p className="text-[9px] text-gray-450">{quest.desc}</p>
                                                 </div>
                                             </div>
 
-                                            {isDone ? (
-                                                <div className="flex items-center gap-1 bg-emerald-500/10 border-2 border-emerald-500 text-emerald-400 px-2.5 py-1 rounded text-[8px] font-bold">
-                                                    <CheckCircle className="w-3 h-3" /> Done
+                                            {status === 'claimed' ? (
+                                                <div className="flex items-center gap-1 bg-gray-500/10 border-2 border-gray-500 text-gray-400 px-2.5 py-1 rounded text-[8px] font-bold">
+                                                    <CheckCircle className="w-3 h-3" /> Done Today
                                                 </div>
+                                            ) : status === 'ready' ? (
+                                                <button 
+                                                    onClick={() => handleClaimQuest(quest.key)}
+                                                    className="flex items-center gap-1 bg-emerald-500 hover:bg-emerald-400 border-2 border-emerald-600 text-gray-900 px-3 py-1.5 rounded text-[9px] font-extrabold cursor-pointer active:scale-95 transition-transform"
+                                                >
+                                                    Claim
+                                                </button>
                                             ) : (
                                                 <div className="bg-amber-500/10 border-2 border-amber-500 text-amber-400 px-2.5 py-1 rounded text-[8px] font-bold">
                                                     Active
@@ -712,15 +783,72 @@ export default function HUD() {
                                         </div>
                                     </div>
                                 </div>
+                                
+                                <button 
+                                    onClick={handleLogout}
+                                    className="w-full mt-2 py-3 bg-red-600 hover:bg-red-500 text-white font-extrabold uppercase rounded-xl border-4 border-slate-900 transition-all active:scale-95 cursor-pointer"
+                                >
+                                    Log Out
+                                </button>
 
-                                <div className="text-center text-[8px] text-gray-550 border-t border-gray-800 pt-2 font-mono">
+                                <div className="text-center text-[8px] text-gray-550 border-t border-gray-800 pt-2 font-mono mt-2">
                                     Helge Village Web3 MMO v0.2.0 • Built on Solana
                                 </div>
                             </div>
                         </div>
                     )}
+
+                    {/* --- 4. SLEEP OVERLAY --- */}
+                    {stats.isSleeping && (
+                        <div className="absolute inset-0 bg-black/85 z-[100] flex flex-col items-center justify-center text-white font-mono pointer-events-auto">
+                            <div className="bg-slate-900 border-4 border-amber-600 rounded-2xl p-8 max-w-sm w-full text-center flex flex-col items-center gap-6 shadow-2xl retro-shadow animate-scale-in">
+                                <div className="text-6xl animate-bounce">💤</div>
+                                <h2 className="text-xl font-black text-amber-400 uppercase tracking-widest">Resting...</h2>
+                                <p className="text-xs text-slate-400">Your character is sleeping in the Inn to restore energy.</p>
+                                
+                                <SleepCountdown duration={30} />
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
+        </div>
+    );
+}
+
+function SleepCountdown({ duration }: { duration: number }) {
+    const [timeLeft, setTimeLeft] = useState(duration);
+
+    useEffect(() => {
+        setTimeLeft(duration);
+        const timer = setInterval(() => {
+            setTimeLeft(prev => {
+                if (prev <= 1) {
+                    clearInterval(timer);
+                    return 0;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+        return () => clearInterval(timer);
+    }, [duration]);
+
+    const percent = (timeLeft / duration) * 100;
+
+    return (
+        <div className="w-full flex flex-col gap-2">
+            <div className="w-full bg-slate-950 border-4 border-slate-800 h-6 rounded-md overflow-hidden relative">
+                <div 
+                    className="bg-emerald-500 h-full transition-all duration-1000"
+                    style={{ width: `${100 - percent}%` }}
+                />
+                <span className="absolute inset-0 flex items-center justify-center font-bold text-xs text-white">
+                    {timeLeft}s
+                </span>
+            </div>
+            <div className="text-[10px] text-gray-500 font-semibold">
+                Please wait while energy is fully restored.
+            </div>
         </div>
     );
 }

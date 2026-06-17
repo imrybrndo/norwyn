@@ -114,6 +114,9 @@ export class Preloader extends Phaser.Scene {
         this.load.image('seeds_generic', '/assets/Elements/Crops/seeds_generic.png');
         this.load.image('soil_dry', '/assets/Elements/Crops/soil_00.png');
         this.load.image('soil_wet', '/assets/Elements/Crops/soil_01.png');
+        
+        // Load Background Music
+        this.load.audio('bgm', '/music.mp3');
     }
 
     create() {

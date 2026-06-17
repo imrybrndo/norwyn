@@ -6,6 +6,7 @@ import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { motion } from 'framer-motion';
 import { Sprout } from 'lucide-react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 
 export default function Navbar() {
@@ -19,7 +20,7 @@ export default function Navbar() {
     const navItems = [
         { name: 'How to Play', path: '/how-to-play' },
         { name: 'Leaderboard', path: '/leaderboard' },
-        { name: 'Docs', path: '#docs', isExternal: true }
+        { name: 'Docs', path: '/docs' }
     ];
 
     return (
@@ -32,8 +33,14 @@ export default function Navbar() {
             >
                 {/* Logo */}
                 <Link href="/" className="flex items-center gap-2 cursor-pointer group">
-                    <div className="w-8 h-8 bg-emerald-100 border border-slate-800 rounded-full flex items-center justify-center group-hover:scale-105 transition-transform duration-200">
-                        <Sprout className="w-4 h-4 text-emerald-600" />
+                    <div className="relative w-8 h-8 group-hover:scale-105 transition-transform duration-200">
+                        <Image 
+                            src="/Logo-Transparant.png" 
+                            alt="Helge Village Logo" 
+                            fill
+                            style={{ objectFit: 'contain' }}
+                            className="select-none"
+                        />
                     </div>
                     <span className="font-pixel text-[10px] md:text-xs tracking-normal text-slate-800 uppercase select-none">
                         Helge Village
@@ -44,15 +51,7 @@ export default function Navbar() {
                 <div className="hidden sm:flex items-center gap-1.5 bg-slate-100 border border-slate-800 p-1 rounded-full">
                     {navItems.map((item) => {
                         const isActive = pathname === item.path;
-                        return item.isExternal ? (
-                            <a
-                                key={item.name}
-                                href={item.path}
-                                className="px-4 py-1.5 rounded-full text-xs font-bold text-slate-650 hover:text-slate-800 transition-colors"
-                            >
-                                {item.name}
-                            </a>
-                        ) : (
+                        return (
                             <Link
                                 key={item.name}
                                 href={item.path}
@@ -66,6 +65,17 @@ export default function Navbar() {
                             </Link>
                         );
                     })}
+                    <a
+                        href="https://x.com/helgevillage"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-3 py-1.5 rounded-full text-xs font-bold text-slate-605 hover:text-slate-800 transition-colors flex items-center justify-center"
+                        title="Follow us on X"
+                    >
+                        <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+                        </svg>
+                    </a>
                 </div>
 
                 {/* Mobile Tab Fallback Link (Only visible on small screens) */}
@@ -90,6 +100,17 @@ export default function Navbar() {
                     >
                         Ranks
                     </Link>
+                    <a
+                        href="https://x.com/helgevillage"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-1.5 rounded-full border border-slate-200 bg-slate-50 text-slate-606 hover:text-slate-800 transition-colors flex items-center justify-center"
+                        title="Follow us on X"
+                    >
+                        <svg className="w-3 h-3 fill-current" viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+                        </svg>
+                    </a>
                 </div>
 
                 {/* Wallet Button - Right Side Capsule */}

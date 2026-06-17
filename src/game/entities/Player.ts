@@ -6,6 +6,8 @@ export class Player extends Phaser.GameObjects.Container {
     clothesSprite: Phaser.GameObjects.Sprite;
     toolSprite: Phaser.GameObjects.Sprite;
     usernameText: Phaser.GameObjects.Text;
+    chatBubble: Phaser.GameObjects.Text;
+    chatTimer: Phaser.Time.TimerEvent | null = null;
     
     cursors: Phaser.Types.Input.Keyboard.CursorKeys;
     wasdKeys: {
@@ -54,6 +56,19 @@ export class Player extends Phaser.GameObjects.Container {
         this.add(this.clothesSprite);
         this.add(this.toolSprite);
         this.add(this.usernameText);
+
+        // Chat Bubble
+        this.chatBubble = scene.add.text(0, -25, '', {
+            fontFamily: 'monospace',
+            fontSize: '28px',
+            color: '#000000',
+            backgroundColor: '#ffffffdd',
+            padding: { x: 8, y: 4 },
+            align: 'center',
+            wordWrap: { width: 400, useAdvancedWrap: true }
+        }).setOrigin(0.5, 1).setScale(0.25).setVisible(false);
+        
+        this.add(this.chatBubble);
 
         scene.physics.add.existing(this);
         const body = this.body as Phaser.Physics.Arcade.Body;
@@ -136,6 +151,17 @@ export class Player extends Phaser.GameObjects.Container {
         this.isMoving = moving;
 
         this.playAnimations();
+    }
+
+    showChat(text: string) {
+        this.chatBubble.setText(text);
+        this.chatBubble.setVisible(true);
+        if (this.chatTimer) {
+            this.chatTimer.destroy();
+        }
+        this.chatTimer = this.scene.time.delayedCall(5000, () => {
+            this.chatBubble.setVisible(false);
+        });
     }
 
     playAnimations() {

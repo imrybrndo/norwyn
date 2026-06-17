@@ -15,6 +15,7 @@ interface PlayerStats {
     wateringCanLevel: number;
     wateringCanDurability: number;
     inventory: InventoryItem[];
+    isSleeping?: boolean;
 }
 
 export default function FacilitiesModal() {
@@ -24,7 +25,8 @@ export default function FacilitiesModal() {
         hunger: 100,
         wateringCanLevel: 1,
         wateringCanDurability: 100,
-        inventory: []
+        inventory: [],
+        isSleeping: false
     });
 
     const [activeFacility, setActiveFacility] = useState<string | null>(null);
@@ -50,6 +52,12 @@ export default function FacilitiesModal() {
             EventBus.off('open-facility-menu', onOpenMenu);
         };
     }, []);
+
+    useEffect(() => {
+        if (stats.isSleeping) {
+            setActiveFacility(null);
+        }
+    }, [stats.isSleeping]);
 
     if (!activeFacility) return null;
 
@@ -323,9 +331,9 @@ export default function FacilitiesModal() {
                                             <div className="text-xs border-t border-gray-800 pt-3">
                                                 <span className="font-bold text-amber-500">Next Upgrade Benefits:</span>
                                                 <ul className="list-disc list-inside mt-1 text-gray-300 flex flex-col gap-1">
-                                                    {stats.wateringCanLevel === 1 && <li>Kecepatan Tumbuh Tanaman +10%</li>}
-                                                    {stats.wateringCanLevel === 2 && <li>Peluang mendapat bibit bagus saat beli naik</li>}
-                                                    {stats.wateringCanLevel === 3 && <li>Konsumsi energi bertani berkurang 20%</li>}
+                                                    {stats.wateringCanLevel === 1 && <li>Plant Growth Speed +10%</li>}
+                                                    {stats.wateringCanLevel === 2 && <li>Higher chance for good seeds from shop</li>}
+                                                    {stats.wateringCanLevel === 3 && <li>Farming energy consumption reduced by 20%</li>}
                                                 </ul>
                                             </div>
                                             

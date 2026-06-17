@@ -12,6 +12,8 @@ function syncPlayerState(player: PlayerState, user: any) {
     player.gold = user.gold ?? 100;
     player.energy = user.energy ?? 100;
     player.hunger = user.hunger ?? 100;
+    player.level = user.level ?? 1;
+    player.exp = user.exp ?? 0;
     player.wateringCanLevel = user.wateringCan?.level ?? 1;
     player.wateringCanDurability = user.wateringCan?.durability ?? 100;
     player.axeLevel = user.axe?.level ?? 1;
@@ -26,6 +28,13 @@ function syncPlayerState(player: PlayerState, user: any) {
             itemState.itemType = item.itemType;
             itemState.count = item.count;
             player.inventory.push(itemState);
+        });
+    }
+
+    player.lastClaimedQuests.clear();
+    if (user.lastClaimedQuests) {
+        user.lastClaimedQuests.forEach((value: number, key: string) => {
+            player.lastClaimedQuests.set(key, value);
         });
     }
 }
@@ -45,6 +54,8 @@ async function savePlayerToDb(player: PlayerState) {
             currentEnergy: player.energy,
             current_energy: player.energy,
             hunger: player.hunger,
+            level: player.level,
+            exp: player.exp,
             gender: player.gender,
             avatarStyle: player.avatarStyle,
             avatar_style: player.avatarStyle,
@@ -64,7 +75,8 @@ async function savePlayerToDb(player: PlayerState) {
             inventory: player.inventory.map(item => ({
                 itemType: item.itemType,
                 count: item.count
-            }))
+            })),
+            lastClaimedQuests: Object.fromEntries(player.lastClaimedQuests)
         });
     } catch (e) {
         console.error(`Error saving user ${player.username} to DB:`, e);
@@ -319,8 +331,24 @@ export class GameRoom extends Room<{ state: GameState }> {
             // Remove crop and add to inventory
             this.state.crops.delete(tileKey);
             addToInventory(player, `crop_${crop.cropType}`, 1);
+            
+            // Add EXP based on crop type
+            let expGained = 10;
+            if (crop.cropType === 'rice') expGained = 10;
+            else if (crop.cropType === 'vegetable') expGained = 25;
+            else if (crop.cropType === 'fruit') expGained = 50;
+            else if (crop.cropType === 'golden_tree') expGained = 100;
+            
+            player.exp += expGained;
+            let requiredExp = player.level * 100;
+            if (player.exp >= requiredExp) {
+                player.level += 1;
+                player.exp -= requiredExp;
+                client.send('toast', { type: 'success', message: `Level Up! You are now Level ${player.level}!` });
+            }
+
             await savePlayerToDb(player);
-            client.send('toast', { type: 'success', message: `Harvested ${crop.cropType}!` });
+            client.send('toast', { type: 'success', message: `Harvested ${crop.cropType}! (+${expGained} EXP)` });
         });
 
         // Sell Crops
@@ -404,10 +432,30 @@ export class GameRoom extends Room<{ state: GameState }> {
             }
 
             player.gold -= 40;
-            player.energy = 100; // Full restore
-            // Hunger is not restored by sleeping
+            player.isSleeping = true;
             await savePlayerToDb(player);
-            client.send('toast', { type: 'success', message: 'Rested! Energy fully restored.' });
+            client.send('toast', { type: 'success', message: 'Going to sleep. Energy will restore in 30 seconds...' });
+
+            this.clock.setTimeout(async () => {
+                const currentPlayer = this.state.players.get(client.sessionId);
+                if (currentPlayer) {
+                    currentPlayer.isSleeping = false;
+                    currentPlayer.energy = 100; // Full restore
+                    await savePlayerToDb(currentPlayer);
+                    client.send('toast', { type: 'success', message: 'Rested! Energy fully restored.' });
+                } else {
+                    // Fallback: If user disconnected during sleep, update energy in DB directly
+                    try {
+                        const query = player.walletAddress 
+                            ? { walletAddress: player.walletAddress } 
+                            : { username: player.username };
+                        await User.updateOne(query, { energy: 100 });
+                        console.log(`[Sleep Offline Complete] Updated disconnected player ${player.username} energy to 100 in DB.`);
+                    } catch (err) {
+                        console.error('Failed to update sleeping disconnected user energy in DB:', err);
+                    }
+                }
+            }, 30000);
         });
 
         // Repair Watering Can
@@ -481,6 +529,44 @@ export class GameRoom extends Room<{ state: GameState }> {
                     timestamp: Date.now()
                 });
             }
+        });
+
+        // Claim Quest
+        this.onMessage('claimQuest', async (client: Client, data: { questId: string }) => {
+            const player = this.state.players.get(client.sessionId);
+            if (!player) return;
+
+            const now = Date.now();
+            const lastClaimed = player.lastClaimedQuests.get(data.questId) || 0;
+            const ONE_DAY = 24 * 60 * 60 * 1000;
+
+            if (now - lastClaimed < ONE_DAY) {
+                client.send('error', 'Quest already claimed today. Try again tomorrow!');
+                return;
+            }
+
+            let expReward = 0;
+            if (data.questId === 'rice') expReward = 50;
+            else if (data.questId === 'vegy') expReward = 100;
+            else if (data.questId === 'apple') expReward = 200;
+            else if (data.questId === 'gold') expReward = 150;
+            else {
+                client.send('error', 'Invalid quest!');
+                return;
+            }
+
+            player.lastClaimedQuests.set(data.questId, now);
+            player.exp += expReward;
+            
+            let requiredExp = player.level * 100;
+            if (player.exp >= requiredExp) {
+                player.level += 1;
+                player.exp -= requiredExp;
+                client.send('toast', { type: 'success', message: `Level Up! You are now Level ${player.level}!` });
+            }
+
+            await savePlayerToDb(player);
+            client.send('toast', { type: 'success', message: `Quest Claimed! +${expReward} EXP` });
         });
     }
 

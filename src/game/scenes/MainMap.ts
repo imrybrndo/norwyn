@@ -16,6 +16,7 @@ export class MainMap extends Phaser.Scene {
     
     room: Room<GameState> | null = null;
     otherPlayers: Map<string, OtherPlayer> = new Map();
+    bgmMusic?: Phaser.Sound.BaseSound;
     
     // Farming crop visual objects mapping: tileKey -> objects
     cropObjects: Map<string, {
@@ -42,7 +43,8 @@ export class MainMap extends Phaser.Scene {
             { itemType: 'seed_vegetable', count: 3 },  // Vegetable seeds
             { itemType: 'seed_fruit', count: 2 },      // Fruit seeds
             { itemType: 'food_bread', count: 1 }       // Starting food
-        ]
+        ],
+        isSleeping: false
     };
 
     localCropsData: Map<string, {
@@ -290,6 +292,7 @@ export class MainMap extends Phaser.Scene {
             gold: this.localStats.gold,
             energy: this.localStats.energy,
             hunger: this.localStats.hunger,
+            isSleeping: this.localStats.isSleeping,
             wateringCanLevel: this.localStats.wateringCanLevel,
             wateringCanDurability: this.localStats.wateringCanDurability,
             inventory: this.localStats.inventory.map(i => ({
@@ -377,9 +380,16 @@ export class MainMap extends Phaser.Scene {
                 return;
             }
             this.localStats.gold -= 40;
-            this.localStats.energy = 100;
-            EventBus.emit('network-toast', { type: 'success', message: 'Rested! Energy fully restored.' });
+            this.localStats.isSleeping = true;
             this.emitLocalStats();
+            EventBus.emit('network-toast', { type: 'success', message: 'Going to sleep. Energy will restore in 30 seconds...' });
+
+            this.time.delayedCall(30000, () => {
+                this.localStats.isSleeping = false;
+                this.localStats.energy = 100;
+                this.emitLocalStats();
+                EventBus.emit('network-toast', { type: 'success', message: 'Rested! Energy fully restored.' });
+            });
         }
 
         else if (type === 'repairTool') {
@@ -672,6 +682,11 @@ export class MainMap extends Phaser.Scene {
 
         // 7. Input: Click on grid to plant/water/harvest
         this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+            const isSleeping = this.room 
+                ? this.room.state.players.get(this.room.sessionId)?.isSleeping 
+                : this.localStats.isSleeping;
+            if (isSleeping) return;
+
             const worldPoint = pointer.positionToCamera(this.cameras.main) as Phaser.Math.Vector2;
             const tileX = Math.floor(worldPoint.x / 16);
             const tileY = Math.floor(worldPoint.y / 16);
@@ -711,6 +726,18 @@ export class MainMap extends Phaser.Scene {
             }
         });
 
+        // Initialize Background Music
+        try {
+            this.bgmMusic = this.sound.add('bgm', { loop: true, volume: 0.35 });
+        } catch (e) {
+            console.warn('Failed to add bgm sound:', e);
+        }
+
+        // Request initial sound settings from React HUD
+        this.time.delayedCall(200, () => {
+            EventBus.emit('request-sound-status');
+        });
+
         // 8. Setup online multiplayer if selected
         if (isOnline) {
             this.connectToRoom(username, clothesIndex, walletAddress);
@@ -740,11 +767,35 @@ export class MainMap extends Phaser.Scene {
             }
         });
 
+        // Listen to toggle-sound event from React
+        EventBus.on('toggle-sound', (enabled: boolean) => {
+            if (this.bgmMusic) {
+                if (enabled) {
+                    if (!this.bgmMusic.isPlaying) {
+                        try {
+                            this.bgmMusic.play();
+                        } catch (e) {
+                            console.warn('BGM play blocked or failed:', e);
+                        }
+                    }
+                } else {
+                    if (this.bgmMusic.isPlaying) {
+                        this.bgmMusic.stop();
+                    }
+                }
+            }
+        });
+
         // Clean up EventBus listener when scene is shut down
         this.events.once('shutdown', () => {
             EventBus.off('send-chat');
             EventBus.off('set-active-item');
             EventBus.off('send-room-message');
+            EventBus.off('toggle-sound');
+            if (this.bgmMusic) {
+                this.bgmMusic.stop();
+                this.bgmMusic.destroy();
+            }
             if (this.room) {
                 this.room.leave();
             }
@@ -790,12 +841,16 @@ export class MainMap extends Phaser.Scene {
                             gold: player.gold,
                             energy: player.energy,
                             hunger: player.hunger,
+                            level: player.level,
+                            exp: player.exp,
+                            isSleeping: player.isSleeping,
                             wateringCanLevel: player.wateringCanLevel,
                             wateringCanDurability: player.wateringCanDurability,
                             inventory: player.inventory.map((item: any) => ({
                                 itemType: item.itemType,
                                 count: item.count
-                            }))
+                            })),
+                            lastClaimedQuests: Object.fromEntries(player.lastClaimedQuests || new Map())
                         });
                         return;
                     }
@@ -806,14 +861,26 @@ export class MainMap extends Phaser.Scene {
                         otherPlayer.targetY = player.y;
                         otherPlayer.currentDirection = player.direction;
                         otherPlayer.isMoving = player.isMoving;
+
+                        // Sleep visual state for other players
+                        otherPlayer.setAlpha(player.isSleeping ? 0.3 : 1.0);
+                        if (player.isSleeping) {
+                            otherPlayer.showChat("Zzz...");
+                        } else if (otherPlayer.chatBubble.text === "Zzz...") {
+                            otherPlayer.chatBubble.setVisible(false);
+                        }
                     }
                 });
 
-                if (sessionId === room.sessionId) return; // Skip spawning other player logic here
+                if (sessionId === room.sessionId) {
+                    EventBus.emit('online-count-changed', room.state.players.size);
+                    return; // Skip spawning other player logic here
+                }
 
                 const otherPlayer = new OtherPlayer(this, player.x, player.y, player.username, player.clothesIndex);
                 otherPlayer.setDepth(5);
                 this.otherPlayers.set(sessionId, otherPlayer);
+                EventBus.emit('online-count-changed', room.state.players.size);
             });
 
             // Handle players leaving
@@ -823,6 +890,7 @@ export class MainMap extends Phaser.Scene {
                     other.destroy();
                     this.otherPlayers.delete(sessionId);
                 }
+                EventBus.emit('online-count-changed', room.state.players.size);
             });
 
             // Handle crops loading from server
@@ -842,6 +910,14 @@ export class MainMap extends Phaser.Scene {
             // Listen to chat message broadcasts
             room.onMessage('chat-message', (data: any) => {
                 EventBus.emit('chat-received', data);
+                if (data.senderId === room.sessionId) {
+                    this.player.showChat(data.text);
+                } else {
+                    const other = this.otherPlayers.get(data.senderId);
+                    if (other) {
+                        other.showChat(data.text);
+                    }
+                }
             });
 
             // Listen to error notifications
@@ -862,7 +938,21 @@ export class MainMap extends Phaser.Scene {
 
     update(time: number, delta: number) {
         if (this.player) {
-            this.player.update();
+            const selfIsSleeping = this.room 
+                ? this.room.state.players.get(this.room.sessionId)?.isSleeping 
+                : this.localStats.isSleeping;
+
+            this.player.setAlpha(selfIsSleeping ? 0.3 : 1.0);
+            if (selfIsSleeping) {
+                this.player.showChat("Zzz...");
+                const body = this.player.body as Phaser.Physics.Arcade.Body;
+                if (body) body.setVelocity(0, 0);
+            } else {
+                if (this.player.chatBubble.text === "Zzz...") {
+                    this.player.chatBubble.setVisible(false);
+                }
+                this.player.update();
+            }
             this.checkProximityTrigger();
 
             // Sync position to server if online

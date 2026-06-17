@@ -22,7 +22,10 @@ export interface IUser extends Document {
     currentEnergy: number;
     current_energy: number; // snake_case compatibility
     hunger: number;
+    level: number;
+    exp: number;
     inventory: IInventoryItem[];
+    lastClaimedQuests: Map<string, number>;
     // Tools extended for 3 professions
     wateringCan: { level: number; durability: number; };
     axe: { level: number; durability: number; };
@@ -50,10 +53,13 @@ const UserSchema: Schema = new Schema({
     currentEnergy: { type: Number, default: 100, min: 0, max: 100 },
     current_energy: { type: Number, default: 100, min: 0, max: 100 },
     hunger: { type: Number, default: 100, min: 0, max: 100 },
+    level: { type: Number, default: 1 },
+    exp: { type: Number, default: 0 },
     inventory: [{
         itemType: { type: String, required: true },
         count: { type: Number, required: true, default: 0 }
     }],
+    lastClaimedQuests: { type: Map, of: Number, default: {} },
     wateringCan: {
         level: { type: Number, default: 1 },
         durability: { type: Number, default: 100, min: 0, max: 100 }

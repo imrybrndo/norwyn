@@ -4,7 +4,7 @@ import "./globals.css";
 import { SolanaProvider } from "../components/providers/SolanaProvider";
 import { cn } from "@/lib/utils";
 
-const geist = Geist({subsets:['latin'],variable:'--font-sans'});
+const geist = Geist({ subsets: ['latin'], variable: '--font-sans' });
 
 const inter = Inter({
   variable: "--font-inter",
@@ -20,6 +20,9 @@ const pressStart2P = Press_Start_2P({
 export const metadata: Metadata = {
   title: "Helge Village - 2D Web3 Farming RPG",
   description: "A multiplayer web3 2D top-down farming simulation game built on Solana.",
+  icons: {
+    icon: "/Logo-Transparant.png",
+  },
 };
 
 export default function RootLayout({
@@ -40,4 +43,3 @@ export default function RootLayout({
     </html>
   );
 }
-

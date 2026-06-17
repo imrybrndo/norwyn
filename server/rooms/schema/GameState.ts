@@ -20,6 +20,8 @@ export class PlayerState extends Schema {
     @type("number") gold: number = 100;
     @type("number") energy: number = 100;
     @type("number") hunger: number = 100;
+    @type("number") level: number = 1;
+    @type("number") exp: number = 0;
     @type("number") wateringCanLevel: number = 1;
     @type("number") wateringCanDurability: number = 100;
     @type("number") axeLevel: number = 1; // [NEW] Woodcutter tool level
@@ -27,6 +29,8 @@ export class PlayerState extends Schema {
     @type("number") fishingRodLevel: number = 1; // [NEW] Fisher tool level
     @type("number") fishingRodDurability: number = 100; // [NEW] Fisher tool durability
     @type([InventoryItemState]) inventory = new ArraySchema<InventoryItemState>();
+    @type({ map: "number" }) lastClaimedQuests = new MapSchema<number>();
+    @type("boolean") isSleeping: boolean = false;
 }
 
 
