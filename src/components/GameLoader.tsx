@@ -17,6 +17,7 @@ interface GameLoaderProps {
     clothesIndex: number;
     isOnline: boolean;
     walletAddress?: string;
+    isGuest?: boolean;
 }
 
 export default function GameLoader(props: GameLoaderProps) {

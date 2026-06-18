@@ -114,7 +114,10 @@ export class Preloader extends Phaser.Scene {
         this.load.image('seeds_generic', '/assets/Elements/Crops/seeds_generic.png');
         this.load.image('soil_dry', '/assets/Elements/Crops/soil_00.png');
         this.load.image('soil_wet', '/assets/Elements/Crops/soil_01.png');
-        this.load.image('chest_sprite', '/assets/chest.png');
+        this.load.spritesheet('sunnyside_tileset_16px_sheet', '/assets/tilesets/spr_tileset_sunnysideworld_16px.png', {
+            frameWidth: 16,
+            frameHeight: 16
+        });
         
         // Load Background Music
         this.load.audio('bgm', '/music.mp3');

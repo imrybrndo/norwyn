@@ -43,6 +43,7 @@ function syncPlayerState(player: PlayerState, user: any) {
 
 // Helper to save current Colyseus player state to DB
 async function savePlayerToDb(player: PlayerState) {
+    if (player.isGuest) return;
     try {
         const query = player.walletAddress 
             ? { walletAddress: player.walletAddress } 
@@ -106,6 +107,21 @@ function deductFromInventory(player: PlayerState, itemType: string, count: numbe
         return true;
     }
     return false;
+}
+
+function gainExp(client: Client, player: PlayerState, amount: number) {
+    player.exp += amount;
+    let requiredExp = player.level * 100;
+    if (player.exp >= requiredExp) {
+        if (player.isGuest) {
+            player.exp = requiredExp - 1; // Cap EXP at Level 1 max
+            client.send('toast', { type: 'warning', message: 'Guest accounts cannot progress past Level 1. Connect a wallet to level up!' });
+        } else {
+            player.level += 1;
+            player.exp -= requiredExp;
+            client.send('toast', { type: 'success', message: `Level Up! You are now Level ${player.level}!` });
+        }
+    }
 }
 
 export class GameRoom extends Room<{ state: GameState }> {
@@ -344,13 +360,7 @@ export class GameRoom extends Room<{ state: GameState }> {
             else if (crop.cropType === 'fruit') expGained = 50;
             else if (crop.cropType === 'golden_tree') expGained = 100;
             
-            player.exp += expGained;
-            let requiredExp = player.level * 100;
-            if (player.exp >= requiredExp) {
-                player.level += 1;
-                player.exp -= requiredExp;
-                client.send('toast', { type: 'success', message: `Level Up! You are now Level ${player.level}!` });
-            }
+            gainExp(client, player, expGained);
 
             await savePlayerToDb(player);
             client.send('toast', { type: 'success', message: `Harvested ${crop.cropType}! (+${expGained} EXP)` });
@@ -561,14 +571,7 @@ export class GameRoom extends Room<{ state: GameState }> {
             }
 
             player.lastClaimedQuests.set(data.questId, now);
-            player.exp += expReward;
-            
-            let requiredExp = player.level * 100;
-            if (player.exp >= requiredExp) {
-                player.level += 1;
-                player.exp -= requiredExp;
-                client.send('toast', { type: 'success', message: `Level Up! You are now Level ${player.level}!` });
-            }
+            gainExp(client, player, expReward);
 
             await savePlayerToDb(player);
             client.send('toast', { type: 'success', message: `Quest Claimed! +${expReward} EXP` });
@@ -580,6 +583,35 @@ export class GameRoom extends Room<{ state: GameState }> {
             if (!player) return;
 
             try {
+                const now = Date.now();
+                const COOLDOWN = 24 * 60 * 60 * 1000; // 24 hours
+
+                if (player.isGuest) {
+                    const timePassed = now - (player.lastDailyChestClaim || 0);
+                    if (timePassed < COOLDOWN) {
+                        const timeLeft = COOLDOWN - timePassed;
+                        const hours = Math.floor(timeLeft / (60 * 60 * 1000));
+                        const minutes = Math.floor((timeLeft % (60 * 60 * 1000)) / (60 * 1000));
+                        
+                        let timeString = hours > 0 ? `${hours} hours and ${minutes} minutes` : `${minutes} minutes`;
+                        client.send('toast', { 
+                            type: 'warning', 
+                            message: `Chest is empty! Next claim in ${timeString}.` 
+                        });
+                        return;
+                    }
+
+                    const goldGained = Math.floor(Math.random() * 101) + 100;
+                    player.gold += goldGained;
+                    player.lastDailyChestClaim = now;
+
+                    client.send('toast', { 
+                        type: 'success', 
+                        message: `You opened the chest and found ${goldGained} Gold!` 
+                    });
+                    return;
+                }
+
                 const query = player.walletAddress 
                     ? { walletAddress: player.walletAddress } 
                     : { username: player.username };
@@ -590,8 +622,6 @@ export class GameRoom extends Room<{ state: GameState }> {
                     return;
                 }
 
-                const now = Date.now();
-                const COOLDOWN = 24 * 60 * 60 * 1000; // 24 hours
                 const timePassed = now - (user.lastDailyChestClaim || 0);
 
                 if (timePassed < COOLDOWN) {
@@ -659,41 +689,57 @@ export class GameRoom extends Room<{ state: GameState }> {
         });
     }
 
-    async onJoin(client: Client, options: { username: string; walletAddress?: string }) {
+    async onJoin(client: Client, options: { username: string; walletAddress?: string; isGuest?: boolean }) {
         console.log(`${client.sessionId} joined!`);
         this.joinTimes.set(client.sessionId, Date.now());
 
         const username = options.username || `Player_${client.sessionId.substring(0, 5)}`;
         
-        let dbUser;
-        try {
-            // Find user in MongoDB, create if not found
-            if (options.walletAddress) {
-                dbUser = await User.findOne({ walletAddress: options.walletAddress });
-            } else {
-                dbUser = await User.findOne({ username });
-            }
-
-            if (!dbUser) {
-                const userFields: any = { username, clothesIndex: 1 };
-                if (options.walletAddress) {
-                    userFields.walletAddress = options.walletAddress;
-                }
-                dbUser = await User.create(userFields);
-            }
-        } catch (e) {
-            console.error('Error fetching user from database on join:', e);
-        }
-
         const player = new PlayerState();
         player.id = client.sessionId;
         player.username = username;
         player.x = 240; // Default spawn coordinates
         player.y = 240;
-        player.clothesIndex = dbUser?.clothesIndex ?? 1;
 
-        if (dbUser) {
-            syncPlayerState(player, dbUser);
+        if (options.isGuest) {
+            player.isGuest = true;
+            player.clothesIndex = 1;
+            player.gold = 100;
+            player.energy = 100;
+            player.hunger = 100;
+            player.level = 1;
+            player.exp = 0;
+            player.wateringCanLevel = 1;
+            player.wateringCanDurability = 100;
+            player.axeLevel = 1;
+            player.axeDurability = 100;
+            player.fishingRodLevel = 1;
+            player.fishingRodDurability = 100;
+        } else {
+            let dbUser;
+            try {
+                // Find user in MongoDB, create if not found
+                if (options.walletAddress) {
+                    dbUser = await User.findOne({ walletAddress: options.walletAddress });
+                } else {
+                    dbUser = await User.findOne({ username });
+                }
+
+                if (!dbUser) {
+                    const userFields: any = { username, clothesIndex: 1 };
+                    if (options.walletAddress) {
+                        userFields.walletAddress = options.walletAddress;
+                    }
+                    dbUser = await User.create(userFields);
+                }
+            } catch (e) {
+                console.error('Error fetching user from database on join:', e);
+            }
+
+            player.clothesIndex = dbUser?.clothesIndex ?? 1;
+            if (dbUser) {
+                syncPlayerState(player, dbUser);
+            }
         }
 
         this.state.players.set(client.sessionId, player);
@@ -704,7 +750,7 @@ export class GameRoom extends Room<{ state: GameState }> {
         const player = this.state.players.get(client.sessionId);
         if (player) {
             const joinTime = this.joinTimes.get(client.sessionId);
-            if (joinTime) {
+            if (joinTime && !player.isGuest) {
                 const playSessionSeconds = Math.floor((Date.now() - joinTime) / 1000);
                 this.joinTimes.delete(client.sessionId);
                 try {

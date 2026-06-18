@@ -13,6 +13,7 @@ interface LandingHeroProps {
     isLoading: boolean;
     onStartOnboarding: () => void;
     onEnterGame: () => void;
+    onEnterGameAsGuest: () => void;
 }
 
 export default function LandingHero({
@@ -20,6 +21,7 @@ export default function LandingHero({
     isLoading,
     onStartOnboarding,
     onEnterGame,
+    onEnterGameAsGuest,
 }: LandingHeroProps) {
     const { connected, publicKey } = useWallet();
     const { setVisible } = useWalletModal();
@@ -99,8 +101,14 @@ export default function LandingHero({
                                 >
                                     PLAY NOW
                                 </button>
-                                <p className="text-slate-500 text-[10px] md:text-xs font-semibold">
-                                    Connect your Solana wallet to begin your journey
+                                <button
+                                    onClick={onEnterGameAsGuest}
+                                    className="w-full py-3 bg-slate-200 hover:bg-slate-300 text-slate-800 font-pixel text-xs rounded-2xl border-2 border-slate-800 shadow-[4px_4px_0_0_#1e293b] active:translate-y-[2px] active:shadow-[2px_2px_0_0_#1e293b] transition-all cursor-pointer font-bold tracking-wider"
+                                >
+                                    PLAY AS GUEST
+                                </button>
+                                <p className="text-slate-500 text-[10px] md:text-xs font-semibold mt-1">
+                                    Connect wallet to save progress, or play as guest (Level 1 limit)
                                 </p>
                             </div>
                         ) : (

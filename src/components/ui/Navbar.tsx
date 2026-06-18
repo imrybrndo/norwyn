@@ -38,6 +38,8 @@ export default function Navbar() {
                             src="/Logo-Transparant.png" 
                             alt="Helge Village Logo" 
                             fill
+                            sizes="32px"
+                            priority
                             style={{ objectFit: 'contain' }}
                             className="select-none"
                         />

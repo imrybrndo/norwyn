@@ -18,12 +18,14 @@ export default function Home() {
         clothesIndex: number;
         walletAddress: string;
         isOnline: boolean;
+        isGuest: boolean;
     }>({
         inGame: false,
         username: '',
         clothesIndex: 1,
         walletAddress: '',
-        isOnline: false
+        isOnline: false,
+        isGuest: false
     });
 
     const [userData, setUserData] = useState<any>(null);
@@ -116,7 +118,20 @@ export default function Home() {
             username: userData.username,
             clothesIndex: userData.clothesIndex,
             walletAddress: publicKey.toBase58(),
-            isOnline: true
+            isOnline: true,
+            isGuest: false
+        });
+    };
+
+    const handleEnterGameAsGuest = () => {
+        const randomId = Math.floor(Math.random() * 9000) + 1000;
+        setGameState({
+            inGame: true,
+            username: `Guest_${randomId}`,
+            clothesIndex: 1,
+            walletAddress: '',
+            isOnline: true,
+            isGuest: true
         });
     };
 
@@ -140,6 +155,7 @@ export default function Home() {
                                 isLoading={isLoadingUser}
                                 onStartOnboarding={handleStartOnboarding}
                                 onEnterGame={handleEnterGame}
+                                onEnterGameAsGuest={handleEnterGameAsGuest}
                             />
                             <FeaturesBento />
                             <footer className="w-full border-t border-slate-200 py-8 text-center text-xs text-slate-450 font-bold mt-auto">
@@ -156,6 +172,7 @@ export default function Home() {
                             clothesIndex={gameState.clothesIndex}
                             walletAddress={gameState.walletAddress}
                             isOnline={gameState.isOnline}
+                            isGuest={gameState.isGuest}
                         />
                     </div>
                     {/* Overlay React UI HUD and Facilities Shop */}

@@ -32,6 +32,7 @@ export class PlayerState extends Schema {
     @type({ map: "number" }) lastClaimedQuests = new MapSchema<number>();
     @type("boolean") isSleeping: boolean = false;
     @type("number") lastDailyChestClaim: number = 0;
+    @type("boolean") isGuest: boolean = false;
 }
 
 

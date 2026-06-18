@@ -38,7 +38,8 @@ export class MainMap extends Phaser.Scene {
         width: number;
         height: number;
     }> = [];
-    chestSprite: Phaser.GameObjects.Image | null = null;
+    chestSprite: Phaser.GameObjects.Sprite | null = null;
+    isChestClaimed: boolean = false;
 
     // Offline Mode Local State
     localStats = {
@@ -271,7 +272,7 @@ export class MainMap extends Phaser.Scene {
         });
 
         this.customInteractables.forEach(obj => {
-            if (obj.name === 'Chest' && this.chestSprite && !this.chestSprite.visible) {
+            if (obj.name === 'Chest' && this.isChestClaimed) {
                 return;
             }
             const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, obj.x, obj.y);
@@ -570,6 +571,7 @@ export class MainMap extends Phaser.Scene {
         const clothesIndex = this.registry.get('clothesIndex') || 1;
         const isOnline = this.registry.get('isOnline') || false;
         const walletAddress = this.registry.get('walletAddress');
+        const isGuest = this.registry.get('isGuest') || false;
 
         // 2. Generate animations
         createAnimations(this);
@@ -597,6 +599,9 @@ export class MainMap extends Phaser.Scene {
 
         this.environmentLayer = map.createLayer('Environment', tilesets, 0, 0) as Phaser.Tilemaps.TilemapLayer;
         this.environmentLayer.setCollisionByExclusion([-1]);
+
+        // Programmatically clear static chest tile (14, 15) to prevent overlapping with dynamic chest sprite
+        this.environmentLayer.removeTileAt(14, 15);
 
         // 5. Spawn local player
         this.player = new Player(this, 240, 240, username, clothesIndex);
@@ -651,7 +656,7 @@ export class MainMap extends Phaser.Scene {
                         });
 
                         if (obj.name === 'Chest') {
-                            this.chestSprite = this.add.image(centerX, centerY, 'chest_sprite');
+                            this.chestSprite = this.add.sprite(centerX, centerY, 'sunnyside_tileset_16px_sheet', 1968);
                             this.chestSprite.setDisplaySize(obj.width, obj.height);
                             this.chestSprite.setDepth(4);
                             this.updateChestVisibility();
@@ -758,6 +763,10 @@ export class MainMap extends Phaser.Scene {
                     return;
                 }
                 
+                if (clickedObject.name === 'Chest' && this.isChestClaimed) {
+                    return;
+                }
+                
                 this.handleCustomObjectInteraction(clickedObject);
                 return;
             }
@@ -814,7 +823,7 @@ export class MainMap extends Phaser.Scene {
 
         // 8. Setup online multiplayer if selected
         if (isOnline) {
-            this.connectToRoom(username, clothesIndex, walletAddress);
+            this.connectToRoom(username, clothesIndex, walletAddress, isGuest);
         } else {
             // Emits initial default stats when offline
             this.time.delayedCall(100, () => this.emitLocalStats());
@@ -892,8 +901,8 @@ export class MainMap extends Phaser.Scene {
         });
     }
 
-    connectToRoom(username: string, clothesIndex: number, walletAddress?: string) {
-        colyseusClient.joinOrCreate('game_room', { username, clothesIndex, walletAddress }, GameState).then(room => {
+    connectToRoom(username: string, clothesIndex: number, walletAddress?: string, isGuest: boolean = false) {
+        colyseusClient.joinOrCreate('game_room', { username, clothesIndex, walletAddress, isGuest }, GameState).then(room => {
             this.room = room;
             console.log('Joined room:', room.roomId);
 
@@ -1138,15 +1147,20 @@ export class MainMap extends Phaser.Scene {
             if (selfPlayer) {
                 lastClaimed = selfPlayer.lastDailyChestClaim || 0;
             }
+        } else {
+            // @ts-ignore
+            lastClaimed = this.localStats.lastDailyChestClaim || 0;
         }
         
         const now = Date.now();
         const COOLDOWN = 24 * 60 * 60 * 1000;
         
-        if (now - lastClaimed < COOLDOWN) {
-            this.chestSprite.setVisible(false);
+        this.isChestClaimed = (now - lastClaimed < COOLDOWN);
+        
+        if (this.isChestClaimed) {
+            this.chestSprite.setFrame(1959); // opened chest tile
         } else {
-            this.chestSprite.setVisible(true);
+            this.chestSprite.setFrame(1968); // closed chest tile
         }
     }
 
@@ -1157,11 +1171,11 @@ export class MainMap extends Phaser.Scene {
             } else {
                 const randomGold = Math.floor(Math.random() * 101) + 100;
                 this.localStats.gold += randomGold;
+                // @ts-ignore
+                this.localStats.lastDailyChestClaim = Date.now();
                 EventBus.emit('network-toast', { type: 'success', message: `[Offline] Opened chest: Got ${randomGold} Gold!` });
                 this.emitLocalStats();
-                if (this.chestSprite) {
-                    this.chestSprite.setVisible(false);
-                }
+                this.updateChestVisibility();
             }
         } else if (obj.name === 'Top Ranking') {
             if (this.room) {
