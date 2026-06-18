@@ -37,6 +37,8 @@ function syncPlayerState(player: PlayerState, user: any) {
             player.lastClaimedQuests.set(key, value);
         });
     }
+
+    player.lastDailyChestClaim = user.lastDailyChestClaim ?? 0;
 }
 
 // Helper to save current Colyseus player state to DB
@@ -76,7 +78,8 @@ async function savePlayerToDb(player: PlayerState) {
                 itemType: item.itemType,
                 count: item.count
             })),
-            lastClaimedQuests: Object.fromEntries(player.lastClaimedQuests)
+            lastClaimedQuests: Object.fromEntries(player.lastClaimedQuests),
+            lastDailyChestClaim: player.lastDailyChestClaim
         });
     } catch (e) {
         console.error(`Error saving user ${player.username} to DB:`, e);
@@ -106,6 +109,8 @@ function deductFromInventory(player: PlayerState, itemType: string, count: numbe
 }
 
 export class GameRoom extends Room<{ state: GameState }> {
+    private joinTimes = new Map<string, number>();
+
     onCreate(options: any) {
         this.setState(new GameState());
 
@@ -568,10 +573,95 @@ export class GameRoom extends Room<{ state: GameState }> {
             await savePlayerToDb(player);
             client.send('toast', { type: 'success', message: `Quest Claimed! +${expReward} EXP` });
         });
+
+        // Claim Daily Treasure Chest
+        this.onMessage('claimChest', async (client: Client) => {
+            const player = this.state.players.get(client.sessionId);
+            if (!player) return;
+
+            try {
+                const query = player.walletAddress 
+                    ? { walletAddress: player.walletAddress } 
+                    : { username: player.username };
+                
+                const user = await User.findOne(query);
+                if (!user) {
+                    client.send('error', 'User not found in database!');
+                    return;
+                }
+
+                const now = Date.now();
+                const COOLDOWN = 24 * 60 * 60 * 1000; // 24 hours
+                const timePassed = now - (user.lastDailyChestClaim || 0);
+
+                if (timePassed < COOLDOWN) {
+                    const timeLeft = COOLDOWN - timePassed;
+                    const hours = Math.floor(timeLeft / (60 * 60 * 1000));
+                    const minutes = Math.floor((timeLeft % (60 * 60 * 1000)) / (60 * 1000));
+                    
+                    let timeString = '';
+                    if (hours > 0) {
+                        timeString = `${hours} hours and ${minutes} minutes`;
+                    } else {
+                        timeString = `${minutes} minutes`;
+                    }
+                    
+                    client.send('toast', { 
+                        type: 'warning', 
+                        message: `Chest is empty! Next claim in ${timeString}.` 
+                    });
+                    return;
+                }
+
+                // Award 100-200 gold
+                const goldGained = Math.floor(Math.random() * 101) + 100;
+                player.gold += goldGained;
+                player.lastDailyChestClaim = now;
+                
+                user.lastDailyChestClaim = now;
+                user.gold = player.gold; // Keep in sync
+                await user.save();
+
+                client.send('toast', { 
+                    type: 'success', 
+                    message: `You opened the chest and found ${goldGained} Gold!` 
+                });
+            } catch (e) {
+                console.error(`Error claiming chest for ${player.username}:`, e);
+                client.send('error', 'Failed to claim chest rewards.');
+            }
+        });
+
+        // Get Playtime Ranking Leaderboard
+        this.onMessage('getPlaytimeRanking', async (client: Client) => {
+            const player = this.state.players.get(client.sessionId);
+            if (!player) return;
+
+            try {
+                // Find top 10 users by totalPlaytime (descending)
+                const topUsers = await User.find({})
+                    .sort({ totalPlaytime: -1 })
+                    .limit(10)
+                    .select('username totalPlaytime walletAddress');
+
+                const data = topUsers.map((u, index) => ({
+                    rank: index + 1,
+                    username: u.username || 'Unknown',
+                    walletAddress: u.walletAddress || '',
+                    totalPlaytime: u.totalPlaytime || 0
+                }));
+
+                client.send('playtimeRankingData', data);
+            } catch (e) {
+                console.error('Error fetching playtime ranking:', e);
+                client.send('error', 'Failed to load ranking leaderboard.');
+            }
+        });
     }
 
     async onJoin(client: Client, options: { username: string; walletAddress?: string }) {
         console.log(`${client.sessionId} joined!`);
+        this.joinTimes.set(client.sessionId, Date.now());
 
         const username = options.username || `Player_${client.sessionId.substring(0, 5)}`;
         
@@ -609,8 +699,27 @@ export class GameRoom extends Room<{ state: GameState }> {
         this.state.players.set(client.sessionId, player);
     }
 
-    onLeave(client: Client, code?: number) {
+    async onLeave(client: Client, code?: number) {
         console.log(`${client.sessionId} left!`);
+        const player = this.state.players.get(client.sessionId);
+        if (player) {
+            const joinTime = this.joinTimes.get(client.sessionId);
+            if (joinTime) {
+                const playSessionSeconds = Math.floor((Date.now() - joinTime) / 1000);
+                this.joinTimes.delete(client.sessionId);
+                try {
+                    const query = player.walletAddress 
+                        ? { walletAddress: player.walletAddress } 
+                        : { username: player.username };
+                    await User.updateOne(query, {
+                        $inc: { totalPlaytime: playSessionSeconds }
+                    });
+                } catch (e) {
+                    console.error(`Error updating playtime for ${player.username}:`, e);
+                }
+            }
+            await savePlayerToDb(player);
+        }
         this.state.players.delete(client.sessionId);
     }
 

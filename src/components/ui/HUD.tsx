@@ -18,6 +18,7 @@ import {
     User,
     HelpCircle
 } from 'lucide-react';
+import PlaytimeRankingModal from './PlaytimeRankingModal';
 
 interface InventoryItem {
     itemType: string;
@@ -96,6 +97,9 @@ export default function HUD() {
     const [activeModal, setActiveModal] = useState<'inventory' | 'quests' | 'settings' | null>(null);
     const [soundEnabled, setSoundEnabled] = useState(true);
 
+    const [isRankingOpen, setIsRankingOpen] = useState(false);
+    const [rankingData, setRankingData] = useState<any[]>([]);
+
     // Chat States
     const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
     const [chatInputText, setChatInputText] = useState('');
@@ -159,12 +163,22 @@ export default function HUD() {
             setOnlineCount(count);
         };
 
+        const onOpenRanking = () => {
+            setIsRankingOpen(true);
+        };
+
+        const onRankingData = (data: any[]) => {
+            setRankingData(data);
+        };
+
         EventBus.on('player-stats-changed', onStatsChanged);
         EventBus.on('near-facility', onNearFacility);
         EventBus.on('network-toast', onToast);
         EventBus.on('network-error', onError);
         EventBus.on('chat-received', handleChatReceived);
         EventBus.on('online-count-changed', handleOnlineCount);
+        EventBus.on('open-playtime-ranking', onOpenRanking);
+        EventBus.on('playtime-ranking-data', onRankingData);
 
         // Set initial Phaser active item
         EventBus.emit('set-active-item', activeItem);
@@ -219,6 +233,8 @@ export default function HUD() {
             EventBus.off('network-error', onError);
             EventBus.off('chat-received', handleChatReceived);
             EventBus.off('online-count-changed', handleOnlineCount);
+            EventBus.off('open-playtime-ranking', onOpenRanking);
+            EventBus.off('playtime-ranking-data', onRankingData);
             window.removeEventListener('keydown', handleKeyDown);
         };
     }, [activeItem, nearFacility, stats.inventory]);
@@ -255,7 +271,11 @@ export default function HUD() {
 
     const openFacilityMenu = () => {
         if (nearFacility) {
-            EventBus.emit('open-facility-menu', nearFacility);
+            if (['Chest', 'Top Ranking', 'Portal 1', 'Portal 2'].includes(nearFacility)) {
+                EventBus.emit('interact-near-object');
+            } else {
+                EventBus.emit('open-facility-menu', nearFacility);
+            }
         }
     };
 
@@ -382,9 +402,9 @@ export default function HUD() {
 
                 {/* Top-Right: Economy */}
                 <div className="bg-gray-900/90 border-4 border-slate-900 p-4 rounded-xl shadow-2xl pointer-events-auto text-white retro-shadow flex items-center gap-3">
-                    <div className="bg-amber-500 p-1.5 rounded-lg border-2 border-slate-900 animate-pulse">
-                        <Coins className="w-5 h-5 text-gray-955" />
-                    </div>
+                   
+                        <img src="/assets/h-coin.png" className="w-8 h-8 object-contain" alt="H-Coin" />
+                 
                     <div className="flex flex-col">
                         <span className="text-[9px] text-gray-400 uppercase tracking-wider">Balance</span>
                         <span className="text-sm font-bold text-amber-400 font-mono tracking-wide">
@@ -401,10 +421,17 @@ export default function HUD() {
                 <div className="absolute top-[40%] left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-2 pointer-events-auto">
                     <div className="bg-amber-500 border-4 border-slate-900 px-6 py-3 rounded-2xl shadow-2xl animate-bounce flex flex-col items-center gap-1">
                         <span className="text-gray-950 font-bold text-xs uppercase tracking-wider text-center">
-                            🏠 {nearFacility.replace('_', ' ')}
+                            {nearFacility === 'Chest' && "🎁 Daily Chest"}
+                            {nearFacility === 'Top Ranking' && "🏆 Playtime Ranking"}
+                            {nearFacility === 'Portal 1' && "🌀 Portal to Forest"}
+                            {nearFacility === 'Portal 2' && "🌀 Portal to Sea"}
+                            {!['Chest', 'Top Ranking', 'Portal 1', 'Portal 2'].includes(nearFacility) && `🏠 ${nearFacility.replace('_', ' ')}`}
                         </span>
                         <span className="text-slate-900 text-[10px] font-bold">
-                            Press [E] to Open Menu
+                            {nearFacility === 'Chest' ? "Press [E] to Open" :
+                             nearFacility === 'Top Ranking' ? "Press [E] to View" :
+                             (nearFacility === 'Portal 1' || nearFacility === 'Portal 2') ? "Press [E] to Enter" :
+                             "Press [E] to Open Menu"}
                         </span>
                     </div>
                 </div>
@@ -812,6 +839,12 @@ export default function HUD() {
                     )}
                 </div>
             )}
+
+            <PlaytimeRankingModal 
+                isOpen={isRankingOpen} 
+                onClose={() => setIsRankingOpen(false)} 
+                rankingData={rankingData} 
+            />
         </div>
     );
 }

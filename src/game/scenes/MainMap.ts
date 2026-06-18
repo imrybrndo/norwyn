@@ -30,6 +30,15 @@ export class MainMap extends Phaser.Scene {
 
     // Farm Plots coordinates loaded dynamically from map
     farmPlots: Array<{ x: number, y: number, width: number, height: number }> = [];
+    customInteractables: Array<{
+        name: string;
+        type: string;
+        x: number;
+        y: number;
+        width: number;
+        height: number;
+    }> = [];
+    chestSprite: Phaser.GameObjects.Image | null = null;
 
     // Offline Mode Local State
     localStats = {
@@ -258,6 +267,17 @@ export class MainMap extends Phaser.Scene {
             if (dist < minDist) {
                 minDist = dist;
                 closest = fac.id;
+            }
+        });
+
+        this.customInteractables.forEach(obj => {
+            if (obj.name === 'Chest' && this.chestSprite && !this.chestSprite.visible) {
+                return;
+            }
+            const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, obj.x, obj.y);
+            if (dist < minDist) {
+                minDist = dist;
+                closest = obj.name;
             }
         });
 
@@ -599,11 +619,11 @@ export class MainMap extends Phaser.Scene {
         this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
         this.cameras.main.setZoom(2.5);
 
-        // 6b. Parse Interactables Layer (shops, beds, and farm plots)
+        // 6b. Parse Interactables Layer (shops, beds, farm plots, and custom objects)
         const interactablesLayer = map.getObjectLayer('Interactables');
         if (interactablesLayer && interactablesLayer.objects) {
             interactablesLayer.objects.forEach(obj => {
-                if (obj.type === 'farm_plot' || obj.name.startsWith('lahan_')) {
+                if (obj.type === 'farm_plot' || (obj.name && obj.name.startsWith('lahan_'))) {
                     if (obj.x !== undefined && obj.y !== undefined && obj.width !== undefined && obj.height !== undefined) {
                         this.farmPlots.push({
                             x: obj.x,
@@ -611,6 +631,31 @@ export class MainMap extends Phaser.Scene {
                             width: obj.width,
                             height: obj.height
                         });
+                    }
+                } else if (
+                    obj.name === 'Chest' || 
+                    obj.name === 'Top Ranking' || 
+                    obj.name === 'Portal 1' || 
+                    obj.name === 'Portal 2'
+                ) {
+                    if (obj.x !== undefined && obj.y !== undefined && obj.width !== undefined && obj.height !== undefined) {
+                        const centerX = obj.x + obj.width / 2;
+                        const centerY = obj.y + obj.height / 2;
+                        this.customInteractables.push({
+                            name: obj.name,
+                            type: obj.type || '',
+                            x: centerX,
+                            y: centerY,
+                            width: obj.width,
+                            height: obj.height
+                        });
+
+                        if (obj.name === 'Chest') {
+                            this.chestSprite = this.add.image(centerX, centerY, 'chest_sprite');
+                            this.chestSprite.setDisplaySize(obj.width, obj.height);
+                            this.chestSprite.setDepth(4);
+                            this.updateChestVisibility();
+                        }
                     }
                 }
             });
@@ -688,6 +733,35 @@ export class MainMap extends Phaser.Scene {
             if (isSleeping) return;
 
             const worldPoint = pointer.positionToCamera(this.cameras.main) as Phaser.Math.Vector2;
+
+            // Check if click was inside a custom interactable object
+            const clickedObject = this.customInteractables.find(obj => {
+                const left = obj.x - obj.width / 2;
+                const right = obj.x + obj.width / 2;
+                const top = obj.y - obj.height / 2;
+                const bottom = obj.y + obj.height / 2;
+                return worldPoint.x >= left && worldPoint.x <= right && 
+                       worldPoint.y >= top && worldPoint.y <= bottom;
+            });
+
+            if (clickedObject) {
+                const left = clickedObject.x - clickedObject.width / 2 - 24;
+                const right = clickedObject.x + clickedObject.width / 2 + 24;
+                const top = clickedObject.y - clickedObject.height / 2 - 24;
+                const bottom = clickedObject.y + clickedObject.height / 2 + 24;
+                
+                const isNear = this.player.x >= left && this.player.x <= right && 
+                               this.player.y >= top && this.player.y <= bottom;
+                
+                if (!isNear) {
+                    EventBus.emit('network-toast', { type: 'warning', message: 'Too far to interact!' });
+                    return;
+                }
+                
+                this.handleCustomObjectInteraction(clickedObject);
+                return;
+            }
+
             const tileX = Math.floor(worldPoint.x / 16);
             const tileY = Math.floor(worldPoint.y / 16);
 
@@ -786,8 +860,18 @@ export class MainMap extends Phaser.Scene {
             }
         });
 
+        EventBus.on('interact-near-object', () => {
+            if (this.currentFacilityNear) {
+                const obj = this.customInteractables.find(c => c.name === this.currentFacilityNear);
+                if (obj) {
+                    this.handleCustomObjectInteraction(obj);
+                }
+            }
+        });
+
         // Clean up EventBus listener when scene is shut down
         this.events.once('shutdown', () => {
+            EventBus.off('interact-near-object');
             EventBus.off('send-chat');
             EventBus.off('set-active-item');
             EventBus.off('send-room-message');
@@ -832,6 +916,10 @@ export class MainMap extends Phaser.Scene {
 
             // Handle new players joining
             callbacks.onAdd("players", (player: any, sessionId: string) => {
+                if (sessionId === room.sessionId) {
+                    this.updateChestVisibility();
+                }
+                
                 // Listen to changes in self or other player's properties
                 callbacks.onChange(player, () => {
                     if (sessionId === room.sessionId) {
@@ -852,6 +940,7 @@ export class MainMap extends Phaser.Scene {
                             })),
                             lastClaimedQuests: Object.fromEntries(player.lastClaimedQuests || new Map())
                         });
+                        this.updateChestVisibility();
                         return;
                     }
 
@@ -928,6 +1017,11 @@ export class MainMap extends Phaser.Scene {
             // Listen to success toast notifications
             room.onMessage('toast', (data: { type: string, message: string }) => {
                 EventBus.emit('network-toast', data);
+            });
+
+            // Listen to playtime ranking data
+            room.onMessage('playtimeRankingData', (data: any) => {
+                EventBus.emit('playtime-ranking-data', data);
             });
 
         }).catch(err => {
@@ -1034,4 +1128,50 @@ export class MainMap extends Phaser.Scene {
             });
         }
     }
+
+    updateChestVisibility() {
+        if (!this.chestSprite) return;
+
+        let lastClaimed = 0;
+        if (this.room) {
+            const selfPlayer = this.room.state.players.get(this.room.sessionId);
+            if (selfPlayer) {
+                lastClaimed = selfPlayer.lastDailyChestClaim || 0;
+            }
+        }
+        
+        const now = Date.now();
+        const COOLDOWN = 24 * 60 * 60 * 1000;
+        
+        if (now - lastClaimed < COOLDOWN) {
+            this.chestSprite.setVisible(false);
+        } else {
+            this.chestSprite.setVisible(true);
+        }
+    }
+
+    handleCustomObjectInteraction(obj: { name: string; x: number; y: number; width: number; height: number }) {
+        if (obj.name === 'Chest') {
+            if (this.room) {
+                this.room.send('claimChest');
+            } else {
+                const randomGold = Math.floor(Math.random() * 101) + 100;
+                this.localStats.gold += randomGold;
+                EventBus.emit('network-toast', { type: 'success', message: `[Offline] Opened chest: Got ${randomGold} Gold!` });
+                this.emitLocalStats();
+                if (this.chestSprite) {
+                    this.chestSprite.setVisible(false);
+                }
+            }
+        } else if (obj.name === 'Top Ranking') {
+            if (this.room) {
+                this.room.send('getPlaytimeRanking');
+            }
+            EventBus.emit('open-playtime-ranking');
+        } else if (obj.name === 'Portal 1' || obj.name === 'Portal 2') {
+            const destination = obj.name === 'Portal 1' ? 'Forest' : 'Sea';
+            EventBus.emit('network-toast', { type: 'warning', message: `The gate to the ${destination} is currently locked!` });
+        }
+    }
 }
+

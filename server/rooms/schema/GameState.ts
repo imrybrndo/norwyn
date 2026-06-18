@@ -31,6 +31,7 @@ export class PlayerState extends Schema {
     @type([InventoryItemState]) inventory = new ArraySchema<InventoryItemState>();
     @type({ map: "number" }) lastClaimedQuests = new MapSchema<number>();
     @type("boolean") isSleeping: boolean = false;
+    @type("number") lastDailyChestClaim: number = 0;
 }
 
 

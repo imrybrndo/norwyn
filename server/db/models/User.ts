@@ -32,6 +32,8 @@ export interface IUser extends Document {
     fishingRod: { level: number; durability: number; };
     lastPosition: { map: string; x: number; y: number; };
     last_coordinates?: { x: number; y: number; map: string; }; // snake_case compatibility
+    lastDailyChestClaim: number;
+    totalPlaytime: number;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -81,7 +83,9 @@ const UserSchema: Schema = new Schema({
         map: { type: String, default: 'farm' },
         x: { type: Number, default: 240 },
         y: { type: Number, default: 240 }
-    }
+    },
+    lastDailyChestClaim: { type: Number, default: 0 },
+    totalPlaytime: { type: Number, default: 0 }
 }, { timestamps: true });
 
 // Pre-save hook to keep snake_case and camelCase parameters synchronized
