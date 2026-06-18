@@ -66,7 +66,7 @@ nextApp.prepare().then(async () => {
         return handle(req, res);
     });
 
-    await gameServer.listen(port);
+    await gameServer.listen(port, '0.0.0.0');
 
     // Prepend request listener to rewrite matchmaking URL for compatibility
     server.prependListener('request', (req, res) => {
