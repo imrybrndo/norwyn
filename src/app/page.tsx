@@ -9,6 +9,7 @@ import LandingHero from '../components/ui/LandingHero';
 import OnboardingFlow from '../components/ui/OnboardingFlow';
 import Navbar from '../components/ui/Navbar';
 import FeaturesBento from '../components/ui/FeaturesBento';
+import BackgroundSlider from '../components/ui/BackgroundSlider';
 
 export default function Home() {
     const { connected, publicKey } = useWallet();
@@ -138,9 +139,10 @@ export default function Home() {
     return (
         <main className="relative w-screen h-screen bg-gray-950 overflow-hidden text-slate-850 font-sans">
             {!gameState.inGame ? (
-                <div className="absolute inset-0 z-20 cozy-pasture-gradient overflow-y-auto">
+                <div className={`absolute inset-0 z-20 flex flex-col ${showOnboarding ? 'overflow-y-auto' : 'overflow-hidden'}`}>
+                    <BackgroundSlider />
                     {showOnboarding ? (
-                        <div className="min-h-screen flex items-center justify-center py-12 px-4">
+                        <div className="min-h-screen flex items-center justify-center py-12 px-4 w-full">
                             <OnboardingFlow 
                                 onBack={handleCancelOnboarding}
                                 onSubmit={handleRegisterOnboarding}
@@ -148,7 +150,7 @@ export default function Home() {
                             />
                         </div>
                     ) : (
-                        <div className="flex flex-col min-h-screen">
+                        <div className="flex flex-col h-full w-full justify-between overflow-hidden">
                             <Navbar />
                             <LandingHero 
                                 userData={userData}
@@ -157,8 +159,7 @@ export default function Home() {
                                 onEnterGame={handleEnterGame}
                                 onEnterGameAsGuest={handleEnterGameAsGuest}
                             />
-                            <FeaturesBento />
-                            <footer className="w-full border-t border-slate-200 py-8 text-center text-xs text-slate-450 font-bold mt-auto">
+                            <footer className="w-full border-t border-slate-200/10 py-4 text-center text-xs text-slate-400 font-bold bg-white/5 backdrop-blur-sm">
                                 &copy; {new Date().getFullYear()} Helge Village. All Rights Reserved. Built on Solana.
                             </footer>
                         </div>
