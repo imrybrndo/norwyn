@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useWallet } from '@solana/wallet-adapter-react';
+import { Volume2, VolumeX } from 'lucide-react';
 import GameLoader from '../components/GameLoader';
 import HUD from '../components/ui/HUD';
 import FacilitiesModal from '../components/ui/FacilitiesModal';
@@ -12,6 +13,22 @@ import FeaturesBento from '../components/ui/FeaturesBento';
 import BackgroundSlider from '../components/ui/BackgroundSlider';
 
 export default function Home() {
+    const audioRef = useRef<HTMLAudioElement>(null);
+    const [isSoundActive, setIsSoundActive] = useState(false);
+
+    useEffect(() => {
+        if (audioRef.current) {
+            audioRef.current.volume = 0.3;
+            if (isSoundActive) {
+                audioRef.current.play().catch(e => console.log("Audio play blocked", e));
+            } else {
+                audioRef.current.pause();
+            }
+        }
+    }, [isSoundActive]);
+
+    const toggleSound = () => setIsSoundActive(prev => !prev);
+
     const { connected, publicKey } = useWallet();
     const [gameState, setGameState] = useState<{
         inGame: boolean;
@@ -159,9 +176,18 @@ export default function Home() {
                                 onEnterGame={handleEnterGame}
                                 onEnterGameAsGuest={handleEnterGameAsGuest}
                             />
-                            <footer className="w-full border-t border-slate-200/10 py-4 text-center text-xs text-slate-400 font-bold bg-white/5 backdrop-blur-sm">
-                                &copy; {new Date().getFullYear()} Helge Village. All Rights Reserved. Built on Solana.
+                            <footer className="w-full border-t border-slate-200/10 py-4 text-center text-xs text-slate-400 font-bold bg-white/5 backdrop-blur-sm relative flex items-center justify-center">
+                                <span>&copy; {new Date().getFullYear()} Helge Village. All Rights Reserved. Built on Solana.</span>
+                                
+                                <button 
+                                    onClick={toggleSound}
+                                    className="absolute right-4 bg-slate-800/80 hover:bg-slate-700 p-2 rounded-full border border-slate-600 text-amber-400 transition-colors shadow-[2px_2px_0_0_#000] active:translate-y-[1px] active:shadow-none"
+                                    title={isSoundActive ? "Mute Sound" : "Play Sound"}
+                                >
+                                    {isSoundActive ? <Volume2 size={16} /> : <VolumeX size={16} />}
+                                </button>
                             </footer>
+                            <audio ref={audioRef} src="/music.mp3" loop />
                         </div>
                     )}
                 </div>
