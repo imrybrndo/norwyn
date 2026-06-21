@@ -90,7 +90,7 @@ export default function HowToPlayPage() {
                         <div className="space-y-4">
                             <h2 className="text-xl md:text-2xl font-pixel text-slate-800">3. Purchase Seed Packs</h2>
                             <p className="text-slate-655 leading-relaxed text-sm">
-                                Head over to the <strong>Seed Shop</strong> in the market area (press **[E]** when standing near the shopkeeper). 
+                                Head over to the <strong>Shop</strong> in the market area (press **[E]** when standing near the shopkeeper). 
                             </p>
                             <p className="text-slate-655 leading-relaxed text-sm">
                                 Each random seed pack costs <strong>20 Gold</strong>. Seeds are drawn using a gacha mechanic. Improving your tools increases the chance of drawing high-tier seeds like Apple or Golden Tree!
@@ -131,7 +131,7 @@ export default function HowToPlayPage() {
                                 When crops mature, they sparkle! Equip Slot 1 (empty hand/sickle) and click to harvest. You receive the crop item in your bag and gain character **EXP**!
                             </p>
                             <p className="text-slate-655 leading-relaxed text-sm">
-                                Return to the Seed Shop to sell your harvested crops for a higher Gold price:
+                                Return to the Shop to sell your harvested crops and fish for a higher Gold price:
                             </p>
                             <ul className="list-disc list-inside text-slate-655 space-y-1 text-sm pl-2">
                                 <li>🌾 Rice: Sell for <strong>2 Gold</strong></li>

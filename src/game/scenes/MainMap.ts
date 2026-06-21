@@ -48,11 +48,14 @@ export class MainMap extends Phaser.Scene {
         hunger: 100,
         wateringCanLevel: 1,
         wateringCanDurability: 100,
+        fishingRodLevel: 1,
+        fishingRodDurability: 100,
         inventory: [
             { itemType: 'seed_rice', count: 5 },       // Rice seeds
             { itemType: 'seed_vegetable', count: 3 },  // Vegetable seeds
             { itemType: 'seed_fruit', count: 2 },      // Fruit seeds
-            { itemType: 'food_bread', count: 1 }       // Starting food
+            { itemType: 'food_bread', count: 1 },      // Starting food
+            { itemType: 'fishing_rod', count: 1 }      // Fishing Rod
         ],
         isSleeping: false
     };
@@ -181,7 +184,7 @@ export class MainMap extends Phaser.Scene {
         const interactablesLayer = map.getObjectLayer('Interactables');
         if (!interactablesLayer || !interactablesLayer.objects) {
             // Fallbacks if layer doesn't exist
-            this.facilities.push({ id: 'seed_shop', x: 240, y: 150, width: 40, height: 40, color: 0x10b981, label: 'SEED SHOP' });
+            this.facilities.push({ id: 'shop', x: 240, y: 150, width: 40, height: 40, color: 0x10b981, label: 'SHOP' });
             this.facilities.push({ id: 'food_house', x: 120, y: 200, width: 40, height: 40, color: 0xf59e0b, label: 'FOOD HOUSE' });
             this.facilities.push({ id: 'tool_repair', x: 240, y: 320, width: 40, height: 40, color: 0x8b5cf6, label: 'TOOL REPAIR' });
             this.facilities.push({ id: 'sleep_house', x: 360, y: 200, width: 40, height: 40, color: 0x3b82f6, label: 'SLEEP HOUSE' });
@@ -208,7 +211,7 @@ export class MainMap extends Phaser.Scene {
 
             if (obj.type === 'shop') {
                 if (obj.name === 'SeedShop') {
-                    this.facilities.push({ id: 'seed_shop', x, y, width, height, color: 0x10b981, label: 'SEED SHOP' });
+                    this.facilities.push({ id: 'shop', x, y, width, height, color: 0x10b981, label: 'SHOP' });
                 } else if (obj.name === 'Food House') {
                     this.facilities.push({ id: 'food_house', x, y, width, height, color: 0xf59e0b, label: 'FOOD HOUSE' });
                 } else if (obj.name === 'Tool Repair') {
@@ -275,8 +278,18 @@ export class MainMap extends Phaser.Scene {
             if (obj.name === 'Chest' && this.isChestClaimed) {
                 return;
             }
-            const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, obj.x, obj.y);
-            if (dist < minDist) {
+            // Calculate distance to bounding box instead of center point
+            const halfW = (obj.width || 0) / 2;
+            const halfH = (obj.height || 0) / 2;
+            const closestX = Math.max(obj.x - halfW, Math.min(this.player.x, obj.x + halfW));
+            const closestY = Math.max(obj.y - halfH, Math.min(this.player.y, obj.y + halfH));
+            const dist = Phaser.Math.Distance.Between(this.player.x, this.player.y, closestX, closestY);
+
+            // Fishing spots need a tighter interaction range so player stands right at the shore
+            const isFishingSpot = obj.name.includes('laut') || obj.name.includes('sungai') || obj.name.includes('danau');
+            const maxRange = isFishingSpot ? 16 : 40;
+
+            if (dist < maxRange && dist < minDist) {
                 minDist = dist;
                 closest = obj.name;
             }
@@ -316,6 +329,8 @@ export class MainMap extends Phaser.Scene {
             isSleeping: this.localStats.isSleeping,
             wateringCanLevel: this.localStats.wateringCanLevel,
             wateringCanDurability: this.localStats.wateringCanDurability,
+            fishingRodLevel: this.localStats.fishingRodLevel || 1,
+            fishingRodDurability: this.localStats.fishingRodDurability ?? 100,
             inventory: this.localStats.inventory.map(i => ({
                 itemType: i.itemType,
                 count: i.count
@@ -426,45 +441,78 @@ export class MainMap extends Phaser.Scene {
             }
 
             this.localStats.gold -= cost;
-            this.localStats.wateringCanDurability = Math.min(100, this.localStats.wateringCanDurability + repairAmount);
-            EventBus.emit('network-toast', { type: 'success', message: 'Watering Can repaired!' });
+            const target = payload.toolType || 'watering_can';
+            if (target === 'fishing_rod') {
+                this.localStats.fishingRodDurability = Math.min(100, (this.localStats.fishingRodDurability || 0) + repairAmount);
+                EventBus.emit('network-toast', { type: 'success', message: 'Fishing Rod repaired!' });
+            } else {
+                this.localStats.wateringCanDurability = Math.min(100, this.localStats.wateringCanDurability + repairAmount);
+                EventBus.emit('network-toast', { type: 'success', message: 'Watering Can repaired!' });
+            }
             this.emitLocalStats();
         }
 
         else if (type === 'upgradeTool') {
-            const nextLvl = this.localStats.wateringCanLevel + 1;
-            let cost = 0;
-            if (nextLvl === 2) cost = 300;
-            else if (nextLvl === 3) cost = 700;
-            else if (nextLvl === 4) cost = 1500;
-            else return;
+            const target = payload?.toolType || 'watering_can';
+            if (target === 'fishing_rod') {
+                const nextLvl = (this.localStats.fishingRodLevel || 1) + 1;
+                let cost = 0;
+                if (nextLvl === 2) cost = 500;
+                else {
+                    EventBus.emit('network-error', 'Fishing Rod already at maximum level!');
+                    return;
+                }
 
-            if (this.localStats.gold < cost) {
-                EventBus.emit('network-error', 'Not enough gold to upgrade!');
-                return;
+                if (this.localStats.gold < cost) {
+                    EventBus.emit('network-error', 'Not enough gold to upgrade!');
+                    return;
+                }
+
+                this.localStats.gold -= cost;
+                this.localStats.fishingRodLevel = nextLvl;
+                this.localStats.fishingRodDurability = 100; // Reset durability
+                EventBus.emit('network-toast', { type: 'success', message: `Fishing Rod upgraded to Level ${nextLvl}!` });
+            } else {
+                const nextLvl = this.localStats.wateringCanLevel + 1;
+                let cost = 0;
+                if (nextLvl === 2) cost = 300;
+                else if (nextLvl === 3) cost = 700;
+                else if (nextLvl === 4) cost = 1500;
+                else {
+                    EventBus.emit('network-error', 'Watering Can already at maximum level!');
+                    return;
+                }
+
+                if (this.localStats.gold < cost) {
+                    EventBus.emit('network-error', 'Not enough gold to upgrade!');
+                    return;
+                }
+
+                this.localStats.gold -= cost;
+                this.localStats.wateringCanLevel = nextLvl;
+                EventBus.emit('network-toast', { type: 'success', message: `Watering Can upgraded to Level ${nextLvl}!` });
             }
-
-            this.localStats.gold -= cost;
-            this.localStats.wateringCanLevel = nextLvl;
-            EventBus.emit('network-toast', { type: 'success', message: `Watering Can upgraded to Level ${nextLvl}!` });
             this.emitLocalStats();
         }
 
         else if (type === 'sellCrop') {
-            const itemType = `crop_${payload.cropType}`;
+            const itemType = payload.cropType.startsWith('fish_') ? payload.cropType : `crop_${payload.cropType}`;
             let sellPrice = 0;
             if (payload.cropType === 'rice') sellPrice = 2;
             else if (payload.cropType === 'vegetable') sellPrice = 50;
             else if (payload.cropType === 'fruit') sellPrice = 100;
             else if (payload.cropType === 'golden_tree') sellPrice = 200;
+            else if (payload.cropType === 'fish_common') sellPrice = 25;
+            else if (payload.cropType === 'fish_uncommon') sellPrice = 60;
+            else if (payload.cropType === 'fish_rare') sellPrice = 150;
 
             const totalEarnings = sellPrice * payload.count;
             if (this.deductLocalInventory(itemType, payload.count)) {
                 this.localStats.gold += totalEarnings;
-                EventBus.emit('network-toast', { type: 'success', message: `Sold crops for ${totalEarnings} Gold!` });
+                EventBus.emit('network-toast', { type: 'success', message: `Sold items for ${totalEarnings} Gold!` });
                 this.emitLocalStats();
             } else {
-                EventBus.emit('network-error', 'Not enough crops to sell!');
+                EventBus.emit('network-error', 'Not enough items to sell!');
             }
         }
     }
@@ -600,8 +648,9 @@ export class MainMap extends Phaser.Scene {
         this.environmentLayer = map.createLayer('Environment', tilesets, 0, 0) as Phaser.Tilemaps.TilemapLayer;
         this.environmentLayer.setCollisionByExclusion([-1]);
 
-        // Programmatically clear static chest tile (14, 15) to prevent overlapping with dynamic chest sprite
+        // Programmatically clear static chest tile (14, 16) to prevent overlapping with dynamic chest sprite
         this.environmentLayer.removeTileAt(14, 15);
+        this.environmentLayer.removeTileAt(14, 16);
 
         // 5. Spawn local player
         this.player = new Player(this, 240, 240, username, clothesIndex);
@@ -641,7 +690,8 @@ export class MainMap extends Phaser.Scene {
                     obj.name === 'Chest' || 
                     obj.name === 'Top Ranking' || 
                     obj.name === 'Portal 1' || 
-                    obj.name === 'Portal 2'
+                    obj.name === 'Portal 2' ||
+                    ((obj as any).class === 'laut' || obj.type === 'laut' || (obj as any).class === 'danau' || obj.type === 'danau' || (obj.name && (obj.name.includes('laut') || obj.name.includes('danau'))))
                 ) {
                     if (obj.x !== undefined && obj.y !== undefined && obj.width !== undefined && obj.height !== undefined) {
                         const centerX = obj.x + obj.width / 2;
@@ -921,6 +971,34 @@ export class MainMap extends Phaser.Scene {
                 }
             });
 
+            // Listen for fishing animation broadcasts
+            room.onMessage('player-start-fishing', (data: { sessionId: string }) => {
+                if (data.sessionId !== room.sessionId) {
+                    const other = this.otherPlayers.get(data.sessionId);
+                    if (other) {
+                        other.startFishingAnimation();
+                    }
+                }
+            });
+
+            room.onMessage('player-stop-fishing', (data: { sessionId: string }) => {
+                if (data.sessionId !== room.sessionId) {
+                    const other = this.otherPlayers.get(data.sessionId);
+                    if (other) {
+                        other.stopFishingAnimation();
+                    }
+                }
+            });
+
+            room.onMessage('player-catch-fish', (data: { sessionId: string }) => {
+                if (data.sessionId !== room.sessionId) {
+                    const other = this.otherPlayers.get(data.sessionId);
+                    if (other) {
+                        other.playCatchAnimation();
+                    }
+                }
+            });
+
             const callbacks = Callbacks.get(room);
 
             // Handle new players joining
@@ -1033,6 +1111,13 @@ export class MainMap extends Phaser.Scene {
                 EventBus.emit('playtime-ranking-data', data);
             });
 
+            // Listen to fishing wait time from server
+            room.onMessage('fishing-wait-time', (data: { waitTime: number }) => {
+                if (this.player) {
+                    this.player.onFishingWaitTimeReceived(data.waitTime);
+                }
+            });
+
         }).catch(err => {
             console.error('Failed to connect to Colyseus server room:', err);
             EventBus.emit('connection-status', { connected: false, error: err.message });
@@ -1096,6 +1181,14 @@ export class MainMap extends Phaser.Scene {
                         this.localStats.hunger = Math.max(0, this.localStats.hunger - 1);
                         changed = true;
                     }
+
+                    // Expire/decay local offline crops after 2 minutes from ready time
+                    this.localCropsData.forEach((crop, tileKey) => {
+                        if (now >= crop.readyAt + 120000) {
+                            this.removeCropObject(tileKey);
+                            this.localCropsData.delete(tileKey);
+                        }
+                    });
 
                     if (changed) {
                         this.emitLocalStats();
@@ -1185,6 +1278,14 @@ export class MainMap extends Phaser.Scene {
         } else if (obj.name === 'Portal 1' || obj.name === 'Portal 2') {
             const destination = obj.name === 'Portal 1' ? 'Forest' : 'Sea';
             EventBus.emit('network-toast', { type: 'warning', message: `The gate to the ${destination} is currently locked!` });
+        } else if (obj.name.includes('laut') || obj.name.includes('sungai') || obj.name.includes('danau')) {
+            if (this.player) {
+                if (this.player.isFishing) {
+                    this.player.attemptReel();
+                } else {
+                    this.player.startFishing(obj.name);
+                }
+            }
         }
     }
 }

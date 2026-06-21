@@ -150,8 +150,8 @@ export default function DocsPage() {
                             </p>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="border-2 border-slate-800 p-4 rounded-2xl bg-white shadow-[2px_2px_0_0_#1e293b]">
-                                    <h4 className="font-pixel text-[8px] text-emerald-700">🌾 Seed Shop</h4>
-                                    <p className="text-slate-605 text-[10px] mt-1">A marketplace to purchase random seed packs for 20 Gold, and sell your harvested crops for gold coins.</p>
+                                    <h4 className="font-pixel text-[8px] text-emerald-700">🛒 Shop</h4>
+                                    <p className="text-slate-605 text-[10px] mt-1">A marketplace to purchase random seed packs for 20 Gold, and sell your harvested crops and fish for gold coins.</p>
                                 </div>
                                 <div className="border-2 border-slate-800 p-4 rounded-2xl bg-white shadow-[2px_2px_0_0_#1e293b]">
                                     <h4 className="font-pixel text-[8px] text-amber-600">🍛 Food House</h4>
@@ -195,7 +195,7 @@ export default function DocsPage() {
                                 </div>
                                 <div>
                                     <span className="absolute -left-[10px] bg-emerald-500 w-4 h-4 rounded-full border-2 border-white flex items-center justify-center text-[8px] text-white font-bold">3</span>
-                                    <strong>Harvest & Sell</strong>: Once the growth timer completes, harvest the crops and sell them at the Seed Shop to earn Gold.
+                                    <strong>Harvest & Sell</strong>: Once the growth timer completes, harvest the crops and sell them at the Shop to earn Gold.
                                 </div>
                                 <div>
                                     <span className="absolute -left-[10px] bg-emerald-500 w-4 h-4 rounded-full border-2 border-white flex items-center justify-center text-[8px] text-white font-bold">4</span>
@@ -395,13 +395,13 @@ export default function DocsPage() {
                 },
                 {
                     id: 'gacha_rates',
-                    title: 'Seed Shop Gacha Rates',
+                    title: 'Shop Gacha Rates',
                     icon: Coins,
                     content: (
                         <div className="space-y-4">
                             <h2 className="text-xl md:text-2xl font-pixel text-slate-800">Seed Pack Probability</h2>
                             <p className="text-slate-655 leading-relaxed text-sm">
-                                Buying random seed packs for **20 Gold** at the Seed Shop draws from a gacha system. Rates improve significantly once your watering can is upgraded to Level 3 or higher:
+                                Buying random seed packs for **20 Gold** at the Shop draws from a gacha system. Rates improve significantly once your watering can is upgraded to Level 3 or higher:
                             </p>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="border-2 border-slate-800 p-4 rounded-2xl bg-white shadow-[2px_2px_0_0_#1e293b]">
@@ -447,7 +447,7 @@ export default function DocsPage() {
                                 <div className="border-2 border-slate-800 p-3.5 rounded-xl bg-white flex justify-between items-center text-xs">
                                     <div>
                                         <h4 className="font-bold text-slate-850">Watering Can Level 3</h4>
-                                        <p className="text-slate-500 text-[10px] mt-0.5">Increases rates for high-tier seeds in the Seed Shop.</p>
+                                        <p className="text-slate-500 text-[10px] mt-0.5">Increases rates for high-tier seeds in the Shop.</p>
                                     </div>
                                     <span className="font-mono bg-slate-100 border border-slate-300 px-2.5 py-1 rounded-full text-slate-700">Cost: 700 Gold</span>
                                 </div>

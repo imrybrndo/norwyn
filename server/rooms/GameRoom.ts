@@ -31,6 +31,14 @@ function syncPlayerState(player: PlayerState, user: any) {
         });
     }
 
+    // Ensure all users have a fishing rod starting item
+    if (!player.inventory.find(i => i.itemType === 'fishing_rod')) {
+        const itemState = new InventoryItemState();
+        itemState.itemType = 'fishing_rod';
+        itemState.count = 1;
+        player.inventory.push(itemState);
+    }
+
     player.lastClaimedQuests.clear();
     if (user.lastClaimedQuests) {
         user.lastClaimedQuests.forEach((value: number, key: string) => {
@@ -126,11 +134,12 @@ function gainExp(client: Client, player: PlayerState, amount: number) {
 
 export class GameRoom extends Room<{ state: GameState }> {
     private joinTimes = new Map<string, number>();
+    private fishingStartTimes = new Map<string, number>();
+    private preRolledFishing = new Map<string, { fishType: string, fishName: string, expGained: number, waitTime: number }>();
 
     onCreate(options: any) {
         this.setState(new GameState());
 
-        // Setup server tick loop (runs every 10 seconds)
         let tickCount = 0;
         this.setSimulationInterval(() => {
             tickCount++;
@@ -152,6 +161,14 @@ export class GameRoom extends Room<{ state: GameState }> {
                 // Save to database if changed
                 if (changed) {
                     await savePlayerToDb(player);
+                }
+            });
+
+            // Crop decay logic: remove crops that have been ready for more than 2 minutes
+            const now = Date.now();
+            this.state.crops.forEach((crop, tileKey) => {
+                if (now >= crop.readyAt + 120000) {
+                    this.state.crops.delete(tileKey);
                 }
             });
         }, 10000);
@@ -280,7 +297,7 @@ export class GameRoom extends Room<{ state: GameState }> {
             crop.plantedAt = Date.now();
             crop.readyAt = Date.now() + growthTime;
             crop.watered = false; // Must be watered to grow/harvest
-            crop.ownerId = client.sessionId;
+            crop.ownerId = player.username;
 
             this.state.crops.set(tileKey, crop);
             await savePlayerToDb(player);
@@ -339,6 +356,11 @@ export class GameRoom extends Room<{ state: GameState }> {
                 return;
             }
 
+            if (crop.ownerId && crop.ownerId !== player.username) {
+                client.send('error', 'Only the player who planted this crop can harvest it!');
+                return;
+            }
+
             if (!crop.watered) {
                 client.send('error', 'Crop was never watered! It cannot grow without water.');
                 return;
@@ -366,20 +388,23 @@ export class GameRoom extends Room<{ state: GameState }> {
             client.send('toast', { type: 'success', message: `Harvested ${crop.cropType}! (+${expGained} EXP)` });
         });
 
-        // Sell Crops
+        // Sell Crops & Fish
         this.onMessage('sellCrop', async (client: Client, data: { cropType: string, count: number }) => {
             const player = this.state.players.get(client.sessionId);
             if (!player) return;
 
-            const itemType = `crop_${data.cropType}`;
+            const itemType = data.cropType.startsWith('fish_') ? data.cropType : `crop_${data.cropType}`;
             let sellPrice = 0;
 
             if (data.cropType === 'rice') sellPrice = 2;
             else if (data.cropType === 'vegetable') sellPrice = 50;
             else if (data.cropType === 'fruit') sellPrice = 100;
             else if (data.cropType === 'golden_tree') sellPrice = 200;
+            else if (data.cropType === 'fish_common') sellPrice = 25;
+            else if (data.cropType === 'fish_uncommon') sellPrice = 60;
+            else if (data.cropType === 'fish_rare') sellPrice = 150;
             else {
-                client.send('error', 'Invalid crop type for sale!');
+                client.send('error', 'Invalid item type for sale!');
                 return;
             }
 
@@ -387,9 +412,9 @@ export class GameRoom extends Room<{ state: GameState }> {
             if (deductFromInventory(player, itemType, data.count)) {
                 player.gold += totalEarnings;
                 await savePlayerToDb(player);
-                client.send('toast', { type: 'success', message: `Sold crops for ${totalEarnings} Gold!` });
+                client.send('toast', { type: 'success', message: `Sold items for ${totalEarnings} Gold!` });
             } else {
-                client.send('error', 'Not enough crops to sell!');
+                client.send('error', 'Not enough items to sell!');
             }
         });
 
@@ -473,8 +498,8 @@ export class GameRoom extends Room<{ state: GameState }> {
             }, 30000);
         });
 
-        // Repair Watering Can
-        this.onMessage('repairTool', async (client: Client, data: { option: 'dur_25' | 'dur_50' | 'dur_full' }) => {
+        // Repair Tool (Watering Can or Fishing Rod)
+        this.onMessage('repairTool', async (client: Client, data: { option: 'dur_25' | 'dur_50' | 'dur_full', toolType?: string }) => {
             const player = this.state.players.get(client.sessionId);
             if (!player) return;
 
@@ -501,36 +526,197 @@ export class GameRoom extends Room<{ state: GameState }> {
             }
 
             player.gold -= cost;
-            player.wateringCanDurability = Math.min(100, player.wateringCanDurability + repairAmount);
+            const target = data.toolType || 'watering_can';
+            if (target === 'fishing_rod') {
+                player.fishingRodDurability = Math.min(100, player.fishingRodDurability + repairAmount);
+                client.send('toast', { type: 'success', message: 'Fishing Rod repaired!' });
+            } else {
+                player.wateringCanDurability = Math.min(100, player.wateringCanDurability + repairAmount);
+                client.send('toast', { type: 'success', message: 'Watering Can repaired!' });
+            }
             await savePlayerToDb(player);
-            client.send('toast', { type: 'success', message: 'Watering Can repaired!' });
         });
 
-        // Upgrade Watering Can
-        this.onMessage('upgradeTool', async (client: Client) => {
+        // Upgrade Tool (Watering Can or Fishing Rod)
+        this.onMessage('upgradeTool', async (client: Client, data?: { toolType?: string }) => {
             const player = this.state.players.get(client.sessionId);
             if (!player) return;
 
-            const nextLvl = player.wateringCanLevel + 1;
-            let cost = 0;
+            const toolType = data?.toolType || 'watering_can';
 
-            if (nextLvl === 2) cost = 300;
-            else if (nextLvl === 3) cost = 700;
-            else if (nextLvl === 4) cost = 1500;
-            else {
-                client.send('error', 'Tool already at maximum level!');
+            if (toolType === 'fishing_rod') {
+                const nextLvl = player.fishingRodLevel + 1;
+                let cost = 0;
+                if (nextLvl === 2) cost = 500;
+                else {
+                    client.send('error', 'Fishing Rod already at maximum level!');
+                    return;
+                }
+
+                if (player.gold < cost) {
+                    client.send('error', 'Not enough gold to upgrade!');
+                    return;
+                }
+
+                player.gold -= cost;
+                player.fishingRodLevel = nextLvl;
+                player.fishingRodDurability = 100; // Reset durability
+                await savePlayerToDb(player);
+                client.send('toast', { type: 'success', message: `Fishing Rod upgraded to Level ${nextLvl}!` });
+            } else {
+                const nextLvl = player.wateringCanLevel + 1;
+                let cost = 0;
+
+                if (nextLvl === 2) cost = 300;
+                else if (nextLvl === 3) cost = 700;
+                else if (nextLvl === 4) cost = 1500;
+                else {
+                    client.send('error', 'Tool already at maximum level!');
+                    return;
+                }
+
+                if (player.gold < cost) {
+                    client.send('error', 'Not enough gold to upgrade!');
+                    return;
+                }
+
+                player.gold -= cost;
+                player.wateringCanLevel = nextLvl;
+                await savePlayerToDb(player);
+                client.send('toast', { type: 'success', message: `Watering Can upgraded to Level ${nextLvl}!` });
+            }
+        });
+
+        // Start Fishing
+        this.onMessage('startFishing', (client: Client) => {
+            const player = this.state.players.get(client.sessionId);
+            if (!player) return;
+
+            // Check if player has a fishing rod in inventory
+            const hasRod = player.inventory.find(i => i.itemType === 'fishing_rod' && i.count > 0);
+            if (!hasRod) {
+                client.send('error', 'You need a Fishing Rod to fish!');
                 return;
             }
 
-            if (player.gold < cost) {
-                client.send('error', 'Not enough gold to upgrade!');
+            // Check durability
+            if (player.fishingRodDurability <= 0) {
+                client.send('error', 'Your Fishing Rod is broken! Repair it at the blacksmith.');
                 return;
             }
 
-            player.gold -= cost;
-            player.wateringCanLevel = nextLvl;
+            // Pre-roll caught fish type based on rod level
+            const roll = Math.random() * 100;
+            let fishType = 'fish_common';
+            let fishName = 'Common Fish';
+            let expGained = 15;
+            let waitTime = 5000; // default 5s for common
+
+            if (player.fishingRodLevel >= 2) {
+                if (roll < 40) {
+                    fishType = 'fish_common';
+                    fishName = 'Common Fish';
+                    expGained = 15;
+                    waitTime = 5000;
+                } else if (roll < 80) {
+                    fishType = 'fish_uncommon';
+                    fishName = 'Uncommon Fish';
+                    expGained = 35;
+                    waitTime = 10000; // unique/rare
+                } else {
+                    fishType = 'fish_rare';
+                    fishName = 'Rare Fish';
+                    expGained = 75;
+                    waitTime = 10000; // unique/rare
+                }
+            } else {
+                if (roll < 70) {
+                    fishType = 'fish_common';
+                    fishName = 'Common Fish';
+                    expGained = 15;
+                    waitTime = 5000;
+                } else if (roll < 95) {
+                    fishType = 'fish_uncommon';
+                    fishName = 'Uncommon Fish';
+                    expGained = 35;
+                    waitTime = 10000;
+                } else {
+                    fishType = 'fish_rare';
+                    fishName = 'Rare Fish';
+                    expGained = 75;
+                    waitTime = 10000;
+                }
+            }
+
+            // Save start time and pre-roll info
+            this.fishingStartTimes.set(client.sessionId, Date.now());
+            this.preRolledFishing.set(client.sessionId, { fishType, fishName, expGained, waitTime });
+
+            this.broadcast('player-start-fishing', { sessionId: client.sessionId });
+
+            // Send waitTime back to client
+            client.send('fishing-wait-time', { waitTime });
+        });
+
+        // Stop/Cancel Fishing
+        this.onMessage('stopFishing', (client: Client) => {
+            this.fishingStartTimes.delete(client.sessionId);
+            this.preRolledFishing.delete(client.sessionId);
+            this.broadcast('player-stop-fishing', { sessionId: client.sessionId });
+        });
+
+        // Catch Fish
+        this.onMessage('catchFish', async (client: Client) => {
+            const player = this.state.players.get(client.sessionId);
+            if (!player) return;
+
+            const startTime = this.fishingStartTimes.get(client.sessionId);
+            const preRolled = this.preRolledFishing.get(client.sessionId);
+            if (!startTime || !preRolled) {
+                client.send('error', 'You are not fishing!');
+                return;
+            }
+
+            const elapsed = Date.now() - startTime;
+            this.fishingStartTimes.delete(client.sessionId);
+            this.preRolledFishing.delete(client.sessionId);
+
+            // Anticheat check: allow 200ms latency buffer
+            if (elapsed < preRolled.waitTime - 200) {
+                client.send('error', 'Too early! The fish got away.');
+                return;
+            }
+
+            // Validate rod and durability
+            const hasRod = player.inventory.find(i => i.itemType === 'fishing_rod' && i.count > 0);
+            if (!hasRod || player.fishingRodDurability <= 0) {
+                client.send('error', 'Invalid fishing rod state.');
+                return;
+            }
+
+            // Deduct durability by 1 per catch
+            player.fishingRodDurability = Math.max(0, player.fishingRodDurability - 1);
+
+            // Add fish to inventory
+            addToInventory(player, preRolled.fishType, 1);
+            gainExp(client, player, preRolled.expGained);
+
+            // Broadcast catch to other players
+            this.broadcast('player-catch-fish', { sessionId: client.sessionId });
+
             await savePlayerToDb(player);
-            client.send('toast', { type: 'success', message: `Watering Can upgraded to Level ${nextLvl}!` });
+
+            client.send('toast', { 
+                type: 'success', 
+                message: `Caught a ${preRolled.fishName}! (+${preRolled.expGained} EXP)` 
+            });
+
+            if (player.fishingRodDurability <= 0) {
+                client.send('toast', {
+                    type: 'error',
+                    message: 'Your Fishing Rod broke! Repair it at the Blacksmith.'
+                });
+            }
         });
 
         // Handle chat messages
@@ -715,6 +901,13 @@ export class GameRoom extends Room<{ state: GameState }> {
             player.axeDurability = 100;
             player.fishingRodLevel = 1;
             player.fishingRodDurability = 100;
+
+            // Set default guest starting inventory
+            addToInventory(player, 'seed_rice', 5);
+            addToInventory(player, 'seed_vegetable', 3);
+            addToInventory(player, 'seed_fruit', 2);
+            addToInventory(player, 'food_bread', 1);
+            addToInventory(player, 'fishing_rod', 1);
         } else {
             let dbUser;
             try {
@@ -726,7 +919,17 @@ export class GameRoom extends Room<{ state: GameState }> {
                 }
 
                 if (!dbUser) {
-                    const userFields: any = { username, clothesIndex: 1 };
+                    const userFields: any = { 
+                        username, 
+                        clothesIndex: 1,
+                        inventory: [
+                            { itemType: 'seed_rice', count: 5 },
+                            { itemType: 'seed_vegetable', count: 3 },
+                            { itemType: 'seed_fruit', count: 2 },
+                            { itemType: 'food_bread', count: 1 },
+                            { itemType: 'fishing_rod', count: 1 }
+                        ]
+                    };
                     if (options.walletAddress) {
                         userFields.walletAddress = options.walletAddress;
                     }

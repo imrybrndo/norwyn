@@ -52,7 +52,7 @@ export class Preloader extends Phaser.Scene {
         });
 
         // Load map and tileset
-        this.load.tilemapTiledJSON('farm_map', '/assets/maps/farm-v2.tmj');
+        this.load.tilemapTiledJSON('farm_map', '/assets/maps/farm-v2.tmj?v=' + Date.now());
         this.load.image('sunnyside_tileset_16px', '/assets/tilesets/spr_tileset_sunnysideworld_16px.png');
         this.load.image('sunnyside_tileset_forest_32px', '/assets/tilesets/spr_tileset_sunnysideworld_forest_32px.png');
 
@@ -95,6 +95,65 @@ export class Preloader extends Phaser.Scene {
                 frameHeight: 64
             });
         }
+
+        // Load fishing animations (casting, waiting, reeling, caught)
+        this.load.spritesheet('player_base_casting', '/assets/Characters/Human/CASTING/base_casting_strip15.png', {
+            frameWidth: 96,
+            frameHeight: 64
+        });
+        this.load.spritesheet('player_tools_casting', '/assets/Characters/Human/CASTING/tools_casting_strip15.png', {
+            frameWidth: 96,
+            frameHeight: 64
+        });
+        this.load.spritesheet('player_base_waiting', '/assets/Characters/Human/WAITING/base_waiting_strip9.png', {
+            frameWidth: 96,
+            frameHeight: 64
+        });
+        this.load.spritesheet('player_tools_waiting', '/assets/Characters/Human/WAITING/tools_waiting_strip9.png', {
+            frameWidth: 96,
+            frameHeight: 64
+        });
+        this.load.spritesheet('player_base_reeling', '/assets/Characters/Human/REELING/base_reeling_strip13.png', {
+            frameWidth: 96,
+            frameHeight: 64
+        });
+        this.load.spritesheet('player_tools_reeling', '/assets/Characters/Human/REELING/tools_reeling_strip13.png', {
+            frameWidth: 96,
+            frameHeight: 64
+        });
+        this.load.spritesheet('player_base_caught', '/assets/Characters/Human/CAUGHT/base_caught_strip10.png', {
+            frameWidth: 96,
+            frameHeight: 64
+        });
+        this.load.spritesheet('player_tools_caught', '/assets/Characters/Human/CAUGHT/tools_caught_strip10.png', {
+            frameWidth: 96,
+            frameHeight: 64
+        });
+
+        for (let i = 1; i <= 3; i++) {
+            const hairNames = ['bowlhair', 'curlyhair', 'longhair'];
+            const hairName = hairNames[i - 1];
+            this.load.spritesheet(`player_clothes_casting_${i}`, `/assets/Characters/Human/CASTING/${hairName}_casting_strip15.png`, {
+                frameWidth: 96,
+                frameHeight: 64
+            });
+            this.load.spritesheet(`player_clothes_waiting_${i}`, `/assets/Characters/Human/WAITING/${hairName}_waiting_strip9.png`, {
+                frameWidth: 96,
+                frameHeight: 64
+            });
+            this.load.spritesheet(`player_clothes_reeling_${i}`, `/assets/Characters/Human/REELING/${hairName}_reeling_strip13.png`, {
+                frameWidth: 96,
+                frameHeight: 64
+            });
+            this.load.spritesheet(`player_clothes_caught_${i}`, `/assets/Characters/Human/CAUGHT/${hairName}_caught_strip10.png`, {
+                frameWidth: 96,
+                frameHeight: 64
+            });
+        }
+
+        // Load UI and alert expression
+        this.load.image('expression_alerted', '/assets/UI/expression_alerted.png');
+
 
         // Load crop sprites (wheat for rice, cabbage for vegetable, pumpkin for fruit, sunflower for golden_tree)
         const cropMap = {

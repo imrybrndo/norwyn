@@ -138,4 +138,84 @@ export class OtherPlayer extends Phaser.GameObjects.Container {
             this.isPerformingAction = false;
         });
     }
+
+    startFishingAnimation() {
+        this.isPerformingAction = true;
+        this.isMoving = false;
+        this.toolSprite.setVisible(true);
+
+        const isFlipped = this.currentDirection === 'left';
+        this.bodySprite.setFlipX(isFlipped);
+        this.clothesSprite.setFlipX(isFlipped);
+        this.toolSprite.setFlipX(isFlipped);
+
+        if (this.scene.anims.exists('player_base_casting')) {
+            this.bodySprite.play('player_base_casting', true);
+        }
+        if (this.scene.anims.exists(`player_clothes_${this.clothesIndex}_casting`)) {
+            this.clothesSprite.play(`player_clothes_${this.clothesIndex}_casting`, true);
+        }
+        if (this.scene.anims.exists('player_tools_casting')) {
+            this.toolSprite.play('player_tools_casting', true);
+        }
+
+        // Wait 1.5s then play waiting anim
+        this.scene.time.delayedCall(1500, () => {
+            if (!this.isPerformingAction) return;
+            if (this.scene.anims.exists('player_base_waiting')) {
+                this.bodySprite.play('player_base_waiting', true);
+            }
+            if (this.scene.anims.exists(`player_clothes_${this.clothesIndex}_waiting`)) {
+                this.clothesSprite.play(`player_clothes_${this.clothesIndex}_waiting`, true);
+            }
+            if (this.scene.anims.exists('player_tools_waiting')) {
+                this.toolSprite.play('player_tools_waiting', true);
+            }
+        });
+    }
+
+    playCatchAnimation() {
+        this.isPerformingAction = true;
+        this.isMoving = false;
+        this.toolSprite.setVisible(true);
+
+        const isFlipped = this.currentDirection === 'left';
+        this.bodySprite.setFlipX(isFlipped);
+        this.clothesSprite.setFlipX(isFlipped);
+        this.toolSprite.setFlipX(isFlipped);
+
+        if (this.scene.anims.exists('player_base_reeling')) {
+            this.bodySprite.play('player_base_reeling', true);
+        }
+        if (this.scene.anims.exists(`player_clothes_${this.clothesIndex}_reeling`)) {
+            this.clothesSprite.play(`player_clothes_${this.clothesIndex}_reeling`, true);
+        }
+        if (this.scene.anims.exists('player_tools_reeling')) {
+            this.toolSprite.play('player_tools_reeling', true);
+        }
+
+        // 1.3s later play caught anim
+        this.scene.time.delayedCall(1300, () => {
+            if (!this.isPerformingAction) return;
+            if (this.scene.anims.exists('player_base_caught')) {
+                this.bodySprite.play('player_base_caught', true);
+            }
+            if (this.scene.anims.exists(`player_clothes_${this.clothesIndex}_caught`)) {
+                this.clothesSprite.play(`player_clothes_${this.clothesIndex}_caught`, true);
+            }
+            if (this.scene.anims.exists('player_tools_caught')) {
+                this.toolSprite.play('player_tools_caught', true);
+            }
+
+            // Celebrate for 1.5s then stop
+            this.scene.time.delayedCall(1500, () => {
+                this.stopFishingAnimation();
+            });
+        });
+    }
+
+    stopFishingAnimation() {
+        this.toolSprite.setVisible(false);
+        this.isPerformingAction = false;
+    }
 }

@@ -33,6 +33,8 @@ interface PlayerStats {
     exp: number;
     wateringCanLevel: number;
     wateringCanDurability: number;
+    fishingRodLevel?: number;
+    fishingRodDurability?: number;
     inventory: InventoryItem[];
     lastClaimedQuests?: Record<string, number>;
     username?: string;
@@ -58,17 +60,25 @@ const getItemMetadata = (itemType: string) => {
         case 'seed_golden_tree':
             return { name: 'Golden Seed', emoji: '⭐', desc: 'A rare seed that grows golden wood.' };
         case 'crop_rice':
-            return { name: 'Rice Crop', image: '/padi.png', desc: 'Harvested rice. Sell at the seed shop.' };
+            return { name: 'Rice Crop', image: '/padi.png', desc: 'Harvested rice. Sell at the shop.' };
         case 'crop_vegetable':
-            return { name: 'Fresh Vegy', emoji: '🥬', desc: 'Harvested vegetable. Sell at the seed shop.' };
+            return { name: 'Fresh Vegy', emoji: '🥬', desc: 'Harvested vegetable. Sell at the shop.' };
         case 'crop_fruit':
-            return { name: 'Apple Crop', emoji: '🍎', desc: 'Harvested apple. Sell at the seed shop.' };
+            return { name: 'Apple Crop', emoji: '🍎', desc: 'Harvested apple. Sell at the shop.' };
         case 'crop_golden_tree':
             return { name: 'Golden Wood', emoji: '⭐', desc: 'Extremely rare wood. Worth a lot of gold.' };
         case 'food_bread':
             return { name: 'Fresh Bread', emoji: '🍞', desc: 'Restores 10 Energy and 20 Hunger.', type: 'food' };
         case 'food_rice_bowl':
             return { name: 'Rice Bowl', emoji: '🍚', desc: 'Restores 30 Energy and 50 Hunger.', type: 'food' };
+        case 'fishing_rod':
+            return { name: 'Fishing Rod', emoji: '🎣', desc: 'Used to catch fish at water spots.' };
+        case 'fish_common':
+            return { name: 'Common Fish', emoji: '🐟', desc: 'A common fish. Sell at the shop.' };
+        case 'fish_uncommon':
+            return { name: 'Uncommon Fish', emoji: '🐠', desc: 'An uncommon fish. Sell at the shop.' };
+        case 'fish_rare':
+            return { name: 'Rare Fish', emoji: '🐡', desc: 'A rare fish. Sell at the shop.' };
         default:
             return { name: itemType.replace('_', ' '), emoji: '📦', desc: 'A pixel item.' };
     }
@@ -83,6 +93,8 @@ export default function HUD() {
         exp: 0,
         wateringCanLevel: 1,
         wateringCanDurability: 100,
+        fishingRodLevel: 1,
+        fishingRodDurability: 100,
         inventory: [],
         lastClaimedQuests: {},
         username: 'Farmer'
@@ -92,6 +104,8 @@ export default function HUD() {
     const [toast, setToast] = useState<{ message: string; type: string } | null>(null);
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
     const [nearFacility, setNearFacility] = useState<string | null>(null);
+
+    const [fishingState, setFishingState] = useState<'IDLE' | 'CASTING' | 'WAITING' | 'BITE' | 'REELING' | 'CAUGHT'>('IDLE');
 
     // Modals Visibility
     const [activeModal, setActiveModal] = useState<'inventory' | 'quests' | 'settings' | null>(null);
@@ -136,6 +150,12 @@ export default function HUD() {
                 username: newStats.username || prev.username
             }));
         };
+
+        const onFishingStateChanged = (state: any) => {
+            setFishingState(state);
+        };
+
+        EventBus.on('player-fishing-state-changed', onFishingStateChanged);
 
         // Listen for proximity check
         const onNearFacility = (facility: string | null) => {
@@ -229,6 +249,7 @@ export default function HUD() {
         return () => {
             EventBus.off('player-stats-changed', onStatsChanged);
             EventBus.off('near-facility', onNearFacility);
+            EventBus.off('player-fishing-state-changed', onFishingStateChanged);
             EventBus.off('network-toast', onToast);
             EventBus.off('network-error', onError);
             EventBus.off('chat-received', handleChatReceived);
@@ -237,7 +258,7 @@ export default function HUD() {
             EventBus.off('playtime-ranking-data', onRankingData);
             window.removeEventListener('keydown', handleKeyDown);
         };
-    }, [activeItem, nearFacility, stats.inventory]);
+    }, [activeItem, nearFacility, stats.inventory, fishingState]);
 
     useEffect(() => {
         EventBus.emit('toggle-sound', soundEnabled);
@@ -271,7 +292,12 @@ export default function HUD() {
 
     const openFacilityMenu = () => {
         if (nearFacility) {
-            if (['Chest', 'Top Ranking', 'Portal 1', 'Portal 2'].includes(nearFacility)) {
+            if (
+                ['Chest', 'Top Ranking', 'Portal 1', 'Portal 2'].includes(nearFacility) ||
+                nearFacility.includes('laut') ||
+                nearFacility.includes('sungai') ||
+                nearFacility.includes('danau')
+            ) {
                 EventBus.emit('interact-near-object');
             } else {
                 EventBus.emit('open-facility-menu', nearFacility);
@@ -419,18 +445,37 @@ export default function HUD() {
                ======================================================== */}
             {nearFacility && (
                 <div className="absolute top-[40%] left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-2 pointer-events-auto">
-                    <div className="bg-amber-500 border-4 border-slate-900 px-6 py-3 rounded-2xl shadow-2xl animate-bounce flex flex-col items-center gap-1">
+                    <div className={`${
+                        fishingState === 'BITE' ? 'bg-rose-500 animate-pulse scale-110' : 'bg-amber-500'
+                    } border-4 border-slate-900 px-6 py-3 rounded-2xl shadow-2xl animate-bounce flex flex-col items-center gap-1 transition-all duration-200`}>
                         <span className="text-gray-950 font-bold text-xs uppercase tracking-wider text-center">
                             {nearFacility === 'Chest' && "🎁 Daily Chest"}
                             {nearFacility === 'Top Ranking' && "🏆 Playtime Ranking"}
                             {nearFacility === 'Portal 1' && "🌀 Portal to Forest"}
                             {nearFacility === 'Portal 2' && "🌀 Portal to Sea"}
-                            {!['Chest', 'Top Ranking', 'Portal 1', 'Portal 2'].includes(nearFacility) && `🏠 ${nearFacility.replace('_', ' ')}`}
+                            {(nearFacility.includes('laut') || nearFacility.includes('sungai') || nearFacility.includes('danau')) && (
+                                fishingState === 'IDLE' ? "🎣 Fishing Spot" :
+                                fishingState === 'CASTING' ? "🎣 Casting Line..." :
+                                fishingState === 'WAITING' ? "⏳ Waiting for a Bite..." :
+                                fishingState === 'BITE' ? "❗️ BITE!" :
+                                fishingState === 'REELING' ? "🎣 Reeling in..." :
+                                "🐠 Caught!"
+                            )}
+                            {!['Chest', 'Top Ranking', 'Portal 1', 'Portal 2'].includes(nearFacility) && 
+                             !nearFacility.includes('laut') && !nearFacility.includes('sungai') && !nearFacility.includes('danau') && 
+                             `🏠 ${nearFacility.replace('_', ' ')}`}
                         </span>
                         <span className="text-slate-900 text-[10px] font-bold">
                             {nearFacility === 'Chest' ? "Press [E] to Open" :
                              nearFacility === 'Top Ranking' ? "Press [E] to View" :
                              (nearFacility === 'Portal 1' || nearFacility === 'Portal 2') ? "Press [E] to Enter" :
+                             (nearFacility.includes('laut') || nearFacility.includes('sungai') || nearFacility.includes('danau')) ? (
+                                 fishingState === 'IDLE' ? "Press [E] to Fish" :
+                                 fishingState === 'CASTING' ? "Get ready..." :
+                                 fishingState === 'WAITING' ? "Wait for the splash!" :
+                                 fishingState === 'BITE' ? "PRESS [E] NOW!" :
+                                 "Pulling..."
+                             ) :
                              "Press [E] to Open Menu"}
                         </span>
                     </div>
