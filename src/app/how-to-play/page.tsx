@@ -3,7 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { 
     Wallet, Sprout, Coins, Wrench, Trophy, ArrowLeft, 
-    Heart, Swords, Award, Menu, X, Keyboard, MessageSquare
+    Heart, Swords, Award, Menu, X, Keyboard, MessageSquare,
+    Fish
 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -78,7 +79,7 @@ export default function HowToPlayPage() {
             ]
         },
         {
-            name: 'Farming Loop',
+            name: 'Farming & Fishing',
             items: [
                 {
                     id: 'buy-seeds',
@@ -90,7 +91,7 @@ export default function HowToPlayPage() {
                         <div className="space-y-4">
                             <h2 className="text-xl md:text-2xl font-pixel text-slate-800">3. Purchase Seed Packs</h2>
                             <p className="text-slate-655 leading-relaxed text-sm">
-                                Head over to the <strong>Shop</strong> in the market area (press **[E]** when standing near the shopkeeper). 
+                                Head over to the <strong>Shop</strong> in the market area (press [E] when standing near the shopkeeper). 
                             </p>
                             <p className="text-slate-655 leading-relaxed text-sm">
                                 Each random seed pack costs <strong>20 Gold</strong>. Seeds are drawn using a gacha mechanic. Improving your tools increases the chance of drawing high-tier seeds like Apple or Golden Tree!
@@ -119,6 +120,28 @@ export default function HowToPlayPage() {
                     )
                 },
                 {
+                    id: 'fishing-basics',
+                    title: 'Catching Fish',
+                    icon: Fish,
+                    imagePath: '/img/fishing_tutorial.png',
+                    screenshotDesc: 'Equip your Fishing Rod and interact near water spots to fish.',
+                    content: (
+                        <div className="space-y-4">
+                            <h2 className="text-xl md:text-2xl font-pixel text-slate-800">5. Catching Fish</h2>
+                            <p className="text-slate-655 leading-relaxed text-sm">
+                                Besides farming, you can catch fish from the ocean or lakes around the village:
+                            </p>
+                            <ul className="list-decimal list-inside text-slate-655 space-y-2 text-sm pl-2">
+                                <li>Ensure the <strong>Fishing Rod</strong> is in your inventory.</li>
+                                <li>Stand next to any ocean or lake water spot.</li>
+                                <li>Click the water to cast your line. You will enter the <span className="font-semibold text-blue-600">WAITING</span> state.</li>
+                                <li>Wait for a fish to bite. When a flashing red <span className="font-bold text-rose-600 font-pixel text-[8px]">❗️ BITE!</span> indicator pops up, quickly click the spot again within <strong>2 seconds</strong> to reel it in!</li>
+                                <li>If successful, you will collect a fish and gain valuable EXP!</li>
+                            </ul>
+                        </div>
+                    )
+                },
+                {
                     id: 'harvest-sell',
                     title: 'Harvesting & Selling',
                     icon: Award,
@@ -126,9 +149,9 @@ export default function HowToPlayPage() {
                     screenshotDesc: 'Harvest mature crops and sell them back to the market for gold profit.',
                     content: (
                         <div className="space-y-4">
-                            <h2 className="text-xl md:text-2xl font-pixel text-slate-800">5. Harvest and Reap Profits</h2>
+                            <h2 className="text-xl md:text-2xl font-pixel text-slate-800">6. Harvest and Reap Profits</h2>
                             <p className="text-slate-655 leading-relaxed text-sm">
-                                When crops mature, they sparkle! Equip Slot 1 (empty hand/sickle) and click to harvest. You receive the crop item in your bag and gain character **EXP**!
+                                When crops mature, they sparkle! Equip Slot 1 (empty hand/sickle) and click to harvest. You receive the crop item in your bag and gain character EXP!
                             </p>
                             <p className="text-slate-655 leading-relaxed text-sm">
                                 Return to the Shop to sell your harvested crops and fish for a higher Gold price:
@@ -138,6 +161,9 @@ export default function HowToPlayPage() {
                                 <li>🥬 Vegetable: Sell for <strong>50 Gold</strong></li>
                                 <li>🍎 Apple: Sell for <strong>100 Gold</strong></li>
                                 <li>⭐ Golden Tree: Sell for <strong>200 Gold</strong></li>
+                                <li>🐟 Common Fish: Sell for <strong>25 Gold</strong></li>
+                                <li>🐠 Uncommon Fish: Sell for <strong>60 Gold</strong></li>
+                                <li>🐡 Rare Fish: Sell for <strong>150 Gold</strong></li>
                             </ul>
                         </div>
                     )
@@ -155,7 +181,7 @@ export default function HowToPlayPage() {
                     screenshotDesc: 'Track your level progress and energy. Use the Sleep Inn to fully recover.',
                     content: (
                         <div className="space-y-4">
-                            <h2 className="text-xl md:text-2xl font-pixel text-slate-800">6. Maintaining Your Stats</h2>
+                            <h2 className="text-xl md:text-2xl font-pixel text-slate-800">7. Maintaining Your Stats</h2>
                             <p className="text-slate-655 leading-relaxed text-sm">
                                 Watch your top-left HUD panel. It displays crucial stats:
                             </p>
@@ -169,21 +195,32 @@ export default function HowToPlayPage() {
                 },
                 {
                     id: 'tool-upgrades',
-                    title: 'Watering Can Upgrades',
+                    title: 'Tool Upgrades',
                     icon: Wrench,
                     imagePath: '/img/img7.png',
-                    screenshotDesc: 'Upgrade your watering can at the Blacksmith workshop to earn special perks.',
+                    screenshotDesc: 'Upgrade your tools at the Blacksmith workshop to earn special perks.',
                     content: (
                         <div className="space-y-4">
-                            <h2 className="text-xl md:text-2xl font-pixel text-slate-800">7. Blacksmith Upgrades</h2>
+                            <h2 className="text-xl md:text-2xl font-pixel text-slate-800">8. Blacksmith Upgrades</h2>
                             <p className="text-slate-655 leading-relaxed text-sm">
-                                Visit the blacksmith workshop (Tool Repair). You can repair the durability of your watering can or pay Gold to upgrade it:
+                                Visit the blacksmith workshop (Tool Repair). You can repair your tools or pay Gold to upgrade them:
                             </p>
-                            <ul className="list-disc list-inside text-slate-655 text-sm space-y-1 pl-2">
-                                <li><strong>Level 2 (300 Gold)</strong>: Speeds up crop growth time by 10%.</li>
-                                <li><strong>Level 3 (700 Gold)</strong>: Boosts gacha draw rates for high-tier seeds in the shop.</li>
-                                <li><strong>Level 4 (1500 Gold)</strong>: Reduces seed planting cost and eliminates water energy usage.</li>
-                            </ul>
+                            <div className="text-slate-655 text-sm space-y-2 pl-2">
+                                <div>
+                                    <strong className="text-slate-800">💧 Watering Can Upgrades:</strong>
+                                    <ul className="list-disc list-inside mt-0.5 space-y-1">
+                                        <li><strong>Level 2 (300 Gold)</strong>: Speeds up crop growth time by 10%.</li>
+                                        <li><strong>Level 3 (700 Gold)</strong>: Boosts gacha draw rates for high-tier seeds in the shop.</li>
+                                        <li><strong>Level 4 (1500 Gold)</strong>: Reduces seed planting cost and eliminates water energy usage.</li>
+                                    </ul>
+                                </div>
+                                <div>
+                                    <strong className="text-slate-800">🎣 Fishing Rod Upgrades:</strong>
+                                    <ul className="list-disc list-inside mt-0.5 space-y-1">
+                                        <li><strong>Level 2 (500 Gold)</strong>: Significantly increases the chance of catching Uncommon and Rare fish.</li>
+                                    </ul>
+                                </div>
+                            </div>
                         </div>
                     )
                 }
@@ -200,9 +237,9 @@ export default function HowToPlayPage() {
                     screenshotDesc: 'Chat messages will float above your character for 5 seconds.',
                     content: (
                         <div className="space-y-4">
-                            <h2 className="text-xl md:text-2xl font-pixel text-slate-800">8. Chatting & Interaction</h2>
+                            <h2 className="text-xl md:text-2xl font-pixel text-slate-800">9. Chatting & Interaction</h2>
                             <p className="text-slate-655 leading-relaxed text-sm">
-                                Press **[Enter]** to focus the chat input bar in the bottom-left. Write your message and hit **[Enter]** again.
+                                Press [Enter] to focus the chat input bar in the bottom-left. Write your message and hit [Enter] again.
                             </p>
                             <p className="text-slate-655 leading-relaxed text-sm">
                                 Your message floats inside a chat bubble above your head for <strong>5 seconds</strong> so nearby players can easily follow the conversation. The bottom-left menu also lists the current count of online villagers.
@@ -218,9 +255,9 @@ export default function HowToPlayPage() {
                     screenshotDesc: 'Complete quests for daily EXP and claim them before they reset.',
                     content: (
                         <div className="space-y-4">
-                            <h2 className="text-xl md:text-2xl font-pixel text-slate-800">9. Daily Quests</h2>
+                            <h2 className="text-xl md:text-2xl font-pixel text-slate-800">10. Daily Quests</h2>
                             <p className="text-slate-655 leading-relaxed text-sm">
-                                Open the **Quest Log** to view available daily assignments (e.g., harvesting specific crops or holding gold).
+                                Open the Quest Log to view available daily assignments (e.g., harvesting specific crops or holding gold).
                             </p>
                             <p className="text-slate-655 leading-relaxed text-sm">
                                 Claiming quests awards huge EXP boosts to accelerate character leveling. Quests are reset <strong>every 24 hours</strong> after they are claimed.

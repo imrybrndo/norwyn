@@ -3,7 +3,8 @@
 import React, { useState, useEffect } from 'react';
 import { 
     Wallet, Sprout, Coins, Wrench, Trophy, ArrowLeft, 
-    BookOpen, Map, Heart, Swords, Award, Menu, X, Keyboard
+    BookOpen, Map, Heart, Swords, Award, Menu, X, Keyboard,
+    Fish
 } from 'lucide-react';
 import Link from 'next/link';
 import Navbar from '@/components/ui/Navbar';
@@ -64,7 +65,7 @@ export default function DocsPage() {
                             </p>
                             <div className="bg-amber-50 border-2 border-amber-600/30 p-4 rounded-2xl text-slate-700 text-xs md:text-sm">
                                 <h4 className="font-bold text-amber-800 uppercase tracking-wide mb-1">💡 Your Wallet Security</h4>
-                                The wallet connection is strictly **Read-Only**. The game will never ask for your seed phrase or private keys. The wallet is only used as a unique profile identifier to save your game progress permanently.
+                                The wallet connection is strictly Read-Only. The game will never ask for your seed phrase or private keys. The wallet is only used as a unique profile identifier to save your game progress permanently.
                             </div>
                             <p className="text-slate-655 leading-relaxed text-sm">
                                 If you don&apos;t have a Web3 wallet, you can still play using the local simulator with default initial stats to test the game offline.
@@ -146,7 +147,7 @@ export default function DocsPage() {
                         <div className="space-y-4">
                             <h2 className="text-xl md:text-2xl font-pixel text-slate-800">Village Facilities</h2>
                             <p className="text-slate-655 leading-relaxed text-sm">
-                                Helge Village provides 4 main facilities that you can interact with by pressing **[E]** when standing nearby:
+                                Helge Village provides 4 main facilities that you can interact with by pressing [E] when standing nearby:
                             </p>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="border-2 border-slate-800 p-4 rounded-2xl bg-white shadow-[2px_2px_0_0_#1e293b]">
@@ -163,7 +164,7 @@ export default function DocsPage() {
                                 </div>
                                 <div className="border-2 border-slate-800 p-4 rounded-2xl bg-white shadow-[2px_2px_0_0_#1e293b]">
                                     <h4 className="font-pixel text-[8px] text-purple-600">🔧 Tool Repair</h4>
-                                    <p className="text-slate-605 text-[10px] mt-1">The blacksmith workshop to repair your watering can durability and upgrade its level for better farming perks.</p>
+                                    <p className="text-slate-605 text-[10px] mt-1">A blacksmith workshop to repair tool durability (watering can and fishing rod) and upgrade them for better perks.</p>
                                 </div>
                             </div>
                         </div>
@@ -256,6 +257,34 @@ export default function DocsPage() {
                             </p>
                         </div>
                     )
+                },
+                {
+                    id: 'fishing',
+                    title: 'Fishing Mechanics',
+                    icon: Fish,
+                    content: (
+                        <div className="space-y-4">
+                            <h2 className="text-xl md:text-2xl font-pixel text-slate-800">Fishing Mechanics</h2>
+                            <p className="text-slate-655 leading-relaxed text-sm">
+                                Cast your line in the village waters to gather fish, earn EXP, and generate profit.
+                            </p>
+                            <div className="bg-blue-50 border-2 border-blue-600/30 p-4 rounded-2xl text-slate-700 text-xs md:text-sm">
+                                <h4 className="font-bold text-blue-800 uppercase tracking-wide mb-1 flex items-center gap-1.5">
+                                    🎣 How to Fish
+                                </h4>
+                                <ul className="list-decimal list-inside space-y-1 mt-1 text-slate-655 pl-2">
+                                    <li><strong>Equip Rod</strong>: Ensure the <strong>Fishing Rod</strong> (hotbar slot 9 or active selection) is equipped.</li>
+                                    <li><strong>Fishing Spot</strong>: Stand near water tiles classified as sea (<code className="bg-slate-100 px-1 rounded">laut_1</code>) or lake (<code className="bg-slate-100 px-1 rounded">danau</code>). Click on the water to cast your line.</li>
+                                    <li><strong>Waiting for Bite</strong>: Your status changes to <span className="font-semibold text-blue-600 font-pixel text-[8px]">WAITING</span>. The wait duration depends on the fish type (5s for Common, 10s for Uncommon/Rare).</li>
+                                    <li><strong>React to Bite</strong>: Once a fish bites, the indicator changes to a flashing red <span className="font-bold text-rose-600 animate-pulse font-pixel text-[8px]">❗️ BITE!</span>. You have exactly 2 seconds to click the screen to reel it in.</li>
+                                    <li><strong>Catch or Miss</strong>: Reel in successfully to receive a fish and its associated EXP. Timing it incorrectly (clicking too early or waiting over 2 seconds) will result in a miss!</li>
+                                </ul>
+                            </div>
+                            <p className="text-slate-655 leading-relaxed text-sm">
+                                Fishing reduces Fishing Rod durability by <strong>1 point</strong> per cast. If durability drops to 0, you cannot fish until it is repaired at the Blacksmith.
+                            </p>
+                        </div>
+                    )
                 }
             ]
         },
@@ -323,11 +352,11 @@ export default function DocsPage() {
                                 Since this is a real-time multiplayer game, you can chat with all online players in the same room.
                             </p>
                             <p className="text-slate-655 leading-relaxed text-sm">
-                                Press **[Enter]** to focus the chat input bar in the bottom-left, type your message, and press **[Enter]** again to broadcast it. 
+                                Press [Enter] to focus the chat input bar in the bottom-left, type your message, and press [Enter] again to broadcast it. 
                             </p>
                             <div className="bg-emerald-50 border-2 border-emerald-600/30 p-4 rounded-2xl text-slate-700 text-xs md:text-sm">
-                                💬 **Chat Bubble Feature**:<br />
-                                Every time you send a message, the chat text floats in a bubble above your player sprite for **5 seconds**, making local conversations intuitive and lively!
+                                💬 Chat Bubble Feature:<br />
+                                Every time you send a message, the chat text floats in a bubble above your player sprite for 5 seconds, making local conversations intuitive and lively!
                             </div>
                         </div>
                     )
@@ -339,22 +368,22 @@ export default function DocsPage() {
             items: [
                 {
                     id: 'crops_table',
-                    title: 'Crop Pricing & Timer',
+                    title: 'Crop & Fish Pricing',
                     icon: Coins,
                     content: (
                         <div className="space-y-4">
-                            <h2 className="text-xl md:text-2xl font-pixel text-slate-800">Crop Statistics & Maturation</h2>
+                            <h2 className="text-xl md:text-2xl font-pixel text-slate-800">Crop & Fish Statistics</h2>
                             <p className="text-slate-655 leading-relaxed text-sm mb-2">
-                                Full details of planting energy costs, maturation timers, EXP gains, and crop sell values:
+                                Full details of production requirements, timers, EXP gains, and sell values:
                             </p>
                             <div className="overflow-x-auto border-2 border-slate-800 rounded-2xl shadow-[2px_2px_0_0_#1e293b] bg-white">
                                 <table className="w-full text-left border-collapse text-xs">
                                     <thead>
                                         <tr className="bg-slate-100 border-b-2 border-slate-850">
-                                            <th className="p-3 font-pixel text-[8px] text-slate-700">Crop</th>
-                                            <th className="p-3 font-pixel text-[8px] text-slate-700">Planting Energy</th>
-                                            <th className="p-3 font-pixel text-[8px] text-slate-700">Growth Time</th>
-                                            <th className="p-3 font-pixel text-[8px] text-slate-700">Harvest EXP</th>
+                                            <th className="p-3 font-pixel text-[8px] text-slate-700">Item</th>
+                                            <th className="p-3 font-pixel text-[8px] text-slate-700">Energy Cost</th>
+                                            <th className="p-3 font-pixel text-[8px] text-slate-700">Time Required</th>
+                                            <th className="p-3 font-pixel text-[8px] text-slate-700">EXP Gained</th>
                                             <th className="p-3 font-pixel text-[8px] text-slate-700">Sell Price</th>
                                         </tr>
                                     </thead>
@@ -380,12 +409,33 @@ export default function DocsPage() {
                                             <td className="p-3 font-mono text-blue-600">+50 EXP</td>
                                             <td className="p-3 font-mono text-amber-600 font-bold">100 Gold</td>
                                         </tr>
-                                        <tr>
+                                        <tr className="border-b border-slate-200">
                                             <td className="p-3 font-semibold">⭐ Golden Tree</td>
                                             <td className="p-3 font-mono">20 Energy</td>
                                             <td className="p-3 font-mono">120 Seconds</td>
                                             <td className="p-3 font-mono text-blue-600">+100 EXP</td>
                                             <td className="p-3 font-mono text-amber-600 font-bold">200 Gold</td>
+                                        </tr>
+                                        <tr className="border-b border-slate-200">
+                                            <td className="p-3 font-semibold">🐟 Common Fish</td>
+                                            <td className="p-3 font-mono">None (Rod dur.)</td>
+                                            <td className="p-3 font-mono">5 Seconds</td>
+                                            <td className="p-3 font-mono text-blue-600">+15 EXP</td>
+                                            <td className="p-3 font-mono text-amber-600 font-bold">25 Gold</td>
+                                        </tr>
+                                        <tr className="border-b border-slate-200">
+                                            <td className="p-3 font-semibold">🐠 Uncommon Fish</td>
+                                            <td className="p-3 font-mono">None (Rod dur.)</td>
+                                            <td className="p-3 font-mono">10 Seconds</td>
+                                            <td className="p-3 font-mono text-blue-600">+35 EXP</td>
+                                            <td className="p-3 font-mono text-amber-600 font-bold">60 Gold</td>
+                                        </tr>
+                                        <tr>
+                                            <td className="p-3 font-semibold">🐡 Rare Fish</td>
+                                            <td className="p-3 font-mono">None (Rod dur.)</td>
+                                            <td className="p-3 font-mono">10 Seconds</td>
+                                            <td className="p-3 font-mono text-blue-600">+75 EXP</td>
+                                            <td className="p-3 font-mono text-amber-600 font-bold">150 Gold</td>
                                         </tr>
                                     </tbody>
                                 </table>
@@ -401,7 +451,7 @@ export default function DocsPage() {
                         <div className="space-y-4">
                             <h2 className="text-xl md:text-2xl font-pixel text-slate-800">Seed Pack Probability</h2>
                             <p className="text-slate-655 leading-relaxed text-sm">
-                                Buying random seed packs for **20 Gold** at the Shop draws from a gacha system. Rates improve significantly once your watering can is upgraded to Level 3 or higher:
+                                Buying random seed packs for 20 Gold at the Shop draws from a gacha system. Rates improve significantly once your watering can is upgraded to Level 3 or higher:
                             </p>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="border-2 border-slate-800 p-4 rounded-2xl bg-white shadow-[2px_2px_0_0_#1e293b]">
@@ -432,21 +482,22 @@ export default function DocsPage() {
                     icon: Wrench,
                     content: (
                         <div className="space-y-4">
-                            <h2 className="text-xl md:text-2xl font-pixel text-slate-800">Watering Can Upgrades & Perks</h2>
+                            <h2 className="text-xl md:text-2xl font-pixel text-slate-800">Tool Upgrades & Perks</h2>
                             <p className="text-slate-655 leading-relaxed text-sm">
-                                Upgrade your watering can at the village workshop (Tool Repair) to unlock permanent passive farming perks:
+                                Upgrade your tools at the blacksmith workshop (Tool Repair) to unlock permanent passive bonuses:
                             </p>
+                            <h3 className="font-pixel text-[10px] text-slate-700 mt-2">💧 Watering Can</h3>
                             <div className="space-y-3">
                                 <div className="border-2 border-slate-800 p-3.5 rounded-xl bg-white flex justify-between items-center text-xs">
                                     <div>
-                                        <h4 className="font-bold text-slate-850">Watering Can Level 2</h4>
+                                        <h4 className="font-bold text-slate-855">Watering Can Level 2</h4>
                                         <p className="text-slate-500 text-[10px] mt-0.5">Speeds up crop maturation time by 10%.</p>
                                     </div>
                                     <span className="font-mono bg-slate-100 border border-slate-300 px-2.5 py-1 rounded-full text-slate-700">Cost: 300 Gold</span>
                                 </div>
                                 <div className="border-2 border-slate-800 p-3.5 rounded-xl bg-white flex justify-between items-center text-xs">
                                     <div>
-                                        <h4 className="font-bold text-slate-850">Watering Can Level 3</h4>
+                                        <h4 className="font-bold text-slate-855">Watering Can Level 3</h4>
                                         <p className="text-slate-500 text-[10px] mt-0.5">Increases rates for high-tier seeds in the Shop.</p>
                                     </div>
                                     <span className="font-mono bg-slate-100 border border-slate-300 px-2.5 py-1 rounded-full text-slate-700">Cost: 700 Gold</span>
@@ -457,6 +508,16 @@ export default function DocsPage() {
                                         <p className="text-slate-500 text-[10px] mt-0.5">Reduces planting energy cost by 20% and cuts watering energy cost to 0.</p>
                                     </div>
                                     <span className="font-mono bg-slate-100 border border-slate-300 px-2.5 py-1 rounded-full text-slate-700">Cost: 1500 Gold</span>
+                                </div>
+                            </div>
+                            <h3 className="font-pixel text-[10px] text-slate-700 mt-4">🎣 Fishing Rod</h3>
+                            <div className="space-y-3">
+                                <div className="border-2 border-slate-800 p-3.5 rounded-xl bg-white flex justify-between items-center text-xs">
+                                    <div>
+                                        <h4 className="font-bold text-slate-855">Fishing Rod Level 2</h4>
+                                        <p className="text-slate-500 text-[10px] mt-0.5">Significantly higher chance of catching Uncommon and Rare fish.</p>
+                                    </div>
+                                    <span className="font-mono bg-slate-100 border border-slate-300 px-2.5 py-1 rounded-full text-slate-700">Cost: 500 Gold</span>
                                 </div>
                             </div>
                         </div>
@@ -474,19 +535,19 @@ export default function DocsPage() {
                             </p>
                             <div className="space-y-3 font-mono text-xs text-slate-655">
                                 <div className="border-2 border-slate-800 p-3 rounded-xl bg-white flex justify-between items-center">
-                                    <span>🌾 **Plant Rice**: Harvest 1 Rice</span>
+                                    <span>🌾 Plant Rice: Harvest 1 Rice</span>
                                     <span className="text-emerald-655 font-bold font-pixel text-[8px]">+50 EXP</span>
                                 </div>
                                 <div className="border-2 border-slate-800 p-3 rounded-xl bg-white flex justify-between items-center">
-                                    <span>🥬 **Eat your Vegy**: Harvest 1 Vegetable</span>
+                                    <span>🥬 Eat your Vegy: Harvest 1 Vegetable</span>
                                     <span className="text-emerald-655 font-bold font-pixel text-[8px]">+100 EXP</span>
                                 </div>
                                 <div className="border-2 border-slate-800 p-3 rounded-xl bg-white flex justify-between items-center">
-                                    <span>🍎 **Apple Season**: Harvest 1 Apple</span>
+                                    <span>🍎 Apple Season: Harvest 1 Apple</span>
                                     <span className="text-emerald-655 font-bold font-pixel text-[8px]">+200 EXP</span>
                                 </div>
                                 <div className="border-2 border-slate-800 p-3 rounded-xl bg-white flex justify-between items-center">
-                                    <span>💰 **Wealth Accumulator**: Hold 500 Gold</span>
+                                    <span>💰 Wealth Accumulator: Hold 500 Gold</span>
                                     <span className="text-emerald-655 font-bold font-pixel text-[8px]">+150 EXP</span>
                                 </div>
                             </div>
