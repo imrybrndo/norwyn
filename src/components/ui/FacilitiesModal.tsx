@@ -106,6 +106,10 @@ export default function FacilitiesModal() {
         EventBus.emit('send-room-message', { type: 'upgradeTool', payload: { toolType } });
     };
 
+    const buyFishingRod = () => {
+        EventBus.emit('send-room-message', { type: 'buyFishingRod' });
+    };
+
     // Helpers
     const getInventoryCount = (itemType: string) => {
         return stats.inventory.find(i => i.itemType === itemType)?.count ?? 0;
@@ -122,6 +126,7 @@ export default function FacilitiesModal() {
                         {activeFacility === 'food_house' && '🍛 Food House'}
                         {activeFacility === 'sleep_house' && '🛏️ Sleep House / Inn'}
                         {activeFacility === 'tool_repair' && '🔧 Tool Repair & Upgrade'}
+                        {activeFacility === 'marketplace' && '🛍️ Marketplace'}
                     </h2>
                     <button 
                         onClick={close}
@@ -471,6 +476,38 @@ export default function FacilitiesModal() {
                                         </>
                                     )}
                                 </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* --- 5. MARKETPLACE --- */}
+                    {activeFacility === 'marketplace' && (
+                        <div className="flex flex-col gap-4 py-2">
+                            <p className="text-xs text-gray-400 text-center mb-2">Buy useful tools and items at the village marketplace</p>
+                            
+                            <div className="flex items-center justify-between bg-gray-950 p-4 rounded-xl border border-gray-800">
+                                <div className="flex items-center gap-3">
+                                    <span className="text-3.5xl">🎣</span>
+                                    <div>
+                                        <h4 className="font-bold text-base">Fishing Rod</h4>
+                                        <p className="text-xs text-amber-500 font-semibold">Allows you to fish at water sources</p>
+                                    </div>
+                                </div>
+                                {getInventoryCount('fishing_rod') > 0 ? (
+                                    <span className="px-4 py-2 bg-gray-800 text-gray-500 rounded-xl text-sm font-extrabold border border-gray-700">
+                                        Owned
+                                    </span>
+                                ) : (
+                                    <button 
+                                        onClick={buyFishingRod}
+                                        disabled={stats.gold < 1000}
+                                        className={`px-4 py-2 rounded-xl text-sm font-extrabold cursor-pointer transition-all ${
+                                            stats.gold >= 1000 ? 'bg-amber-500 text-gray-950 hover:bg-amber-400 active:scale-95' : 'bg-gray-800 text-gray-600 cursor-not-allowed'
+                                        }`}
+                                    >
+                                        Buy (1000 G)
+                                    </button>
+                                )}
                             </div>
                         </div>
                     )}

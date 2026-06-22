@@ -31,14 +31,6 @@ function syncPlayerState(player: PlayerState, user: any) {
         });
     }
 
-    // Ensure all users have a fishing rod starting item
-    if (!player.inventory.find(i => i.itemType === 'fishing_rod')) {
-        const itemState = new InventoryItemState();
-        itemState.itemType = 'fishing_rod';
-        itemState.count = 1;
-        player.inventory.push(itemState);
-    }
-
     player.lastClaimedQuests.clear();
     if (user.lastClaimedQuests) {
         user.lastClaimedQuests.forEach((value: number, key: string) => {
@@ -441,6 +433,34 @@ export class GameRoom extends Room<{ state: GameState }> {
             await savePlayerToDb(player);
         });
 
+        // Buy Fishing Rod
+        this.onMessage('buyFishingRod', async (client: Client) => {
+            const player = this.state.players.get(client.sessionId);
+            if (!player) return;
+
+            const price = 1000;
+            if (player.gold < price) {
+                client.send('error', 'Not enough gold to buy a Fishing Rod!');
+                return;
+            }
+
+            const hasRod = player.inventory.find(i => i.itemType === 'fishing_rod' && i.count > 0);
+            if (hasRod) {
+                client.send('error', 'You already own a Fishing Rod!');
+                return;
+            }
+
+            player.gold -= price;
+            addToInventory(player, 'fishing_rod', 1);
+
+            // Set default rod properties
+            player.fishingRodLevel = 1;
+            player.fishingRodDurability = 100;
+
+            await savePlayerToDb(player);
+            client.send('toast', { type: 'success', message: 'Purchased Fishing Rod!' });
+        });
+
         // Eat Food
         this.onMessage('eatFood', async (client: Client, data: { foodType: string }) => {
             const player = this.state.players.get(client.sessionId);
@@ -751,6 +771,7 @@ export class GameRoom extends Room<{ state: GameState }> {
             else if (data.questId === 'vegy') expReward = 100;
             else if (data.questId === 'apple') expReward = 200;
             else if (data.questId === 'gold') expReward = 150;
+            else if (data.questId === 'fish') expReward = 150;
             else {
                 client.send('error', 'Invalid quest!');
                 return;
@@ -926,8 +947,7 @@ export class GameRoom extends Room<{ state: GameState }> {
                             { itemType: 'seed_rice', count: 5 },
                             { itemType: 'seed_vegetable', count: 3 },
                             { itemType: 'seed_fruit', count: 2 },
-                            { itemType: 'food_bread', count: 1 },
-                            { itemType: 'fishing_rod', count: 1 }
+                            { itemType: 'food_bread', count: 1 }
                         ]
                     };
                     if (options.walletAddress) {

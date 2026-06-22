@@ -353,6 +353,10 @@ export default function HUD() {
                 return getInventoryCount('crop_fruit') >= 1 ? 'ready' : 'active';
             case 'gold':
                 return stats.gold >= 500 ? 'ready' : 'active';
+            case 'fish':
+                return (getInventoryCount('fish_common') >= 1 || 
+                        getInventoryCount('fish_uncommon') >= 1 || 
+                        getInventoryCount('fish_rare') >= 1) ? 'ready' : 'active';
             default:
                 return 'active';
         }
@@ -759,7 +763,8 @@ export default function HUD() {
                                     { key: 'rice', title: 'Plant Rice', desc: 'Harvest 1 Rice Crop.', iconImg: '/padi.png' },
                                     { key: 'vegy', title: 'Eat your Vegy', desc: 'Harvest 1 Vegetable Crop.', icon: '🥬' },
                                     { key: 'apple', title: 'Apple Season', desc: 'Harvest 1 Apple.', icon: '🍎' },
-                                    { key: 'gold', title: 'Wealth Accumulator', desc: 'Acquire 500 gold.', icon: '💰' }
+                                    { key: 'gold', title: 'Wealth Accumulator', desc: 'Acquire 500 gold.', icon: '💰' },
+                                    { key: 'fish', title: 'Master Angler', desc: 'Catch 1 Fish (Any).', icon: '🎣' }
                                 ].map(quest => {
                                     const status = getQuestStatus(quest.key);
                                     return (
@@ -869,19 +874,19 @@ export default function HUD() {
                             </div>
                         </div>
                     )}
+                </div>
+            )}
 
-                    {/* --- 4. SLEEP OVERLAY --- */}
-                    {stats.isSleeping && (
-                        <div className="absolute inset-0 bg-black/85 z-[100] flex flex-col items-center justify-center text-white font-mono pointer-events-auto">
-                            <div className="bg-slate-900 border-4 border-amber-600 rounded-2xl p-8 max-w-sm w-full text-center flex flex-col items-center gap-6 shadow-2xl retro-shadow animate-scale-in">
-                                <div className="text-6xl animate-bounce">💤</div>
-                                <h2 className="text-xl font-black text-amber-400 uppercase tracking-widest">Resting...</h2>
-                                <p className="text-xs text-slate-400">Your character is sleeping in the Inn to restore energy.</p>
-                                
-                                <SleepCountdown duration={30} />
-                            </div>
-                        </div>
-                    )}
+            {/* --- 4. SLEEP OVERLAY --- */}
+            {stats.isSleeping && (
+                <div className="absolute inset-0 bg-black/85 z-[100] flex flex-col items-center justify-center text-white font-mono pointer-events-auto">
+                    <div className="bg-slate-900 border-4 border-amber-600 rounded-2xl p-8 max-w-sm w-full text-center flex flex-col items-center gap-6 shadow-2xl retro-shadow animate-scale-in">
+                        <div className="text-6xl animate-bounce">💤</div>
+                        <h2 className="text-xl font-black text-amber-400 uppercase tracking-widest">Resting...</h2>
+                        <p className="text-xs text-slate-400">Your character is sleeping in the Inn to restore energy.</p>
+                        
+                        <SleepCountdown duration={30} />
+                    </div>
                 </div>
             )}
 

@@ -216,6 +216,8 @@ export class MainMap extends Phaser.Scene {
                     this.facilities.push({ id: 'food_house', x, y, width, height, color: 0xf59e0b, label: 'FOOD HOUSE' });
                 } else if (obj.name === 'Tool Repair') {
                     this.facilities.push({ id: 'tool_repair', x, y, width, height, color: 0x8b5cf6, label: 'TOOL REPAIR' });
+                } else if (obj.name === 'Marketplace') {
+                    this.facilities.push({ id: 'marketplace', x, y, width, height, color: 0xec4899, label: 'MARKETPLACE' });
                 }
             } else if (obj.type === 'bed') {
                 hasBeds = true;
@@ -391,6 +393,23 @@ export class MainMap extends Phaser.Scene {
             this.localStats.gold -= price;
             this.addLocalInventory(payload.foodType, 1);
             EventBus.emit('network-toast', { type: 'success', message: `Bought food!` });
+            this.emitLocalStats();
+        }
+
+        else if (type === 'buyFishingRod') {
+            const price = 1000;
+            if (this.localStats.gold < price) {
+                EventBus.emit('network-error', 'Not enough gold!');
+                return;
+            }
+            const hasRod = this.localStats.inventory.find(i => i.itemType === 'fishing_rod' && i.count > 0);
+            if (hasRod) {
+                EventBus.emit('network-error', 'You already own a Fishing Rod!');
+                return;
+            }
+            this.localStats.gold -= price;
+            this.addLocalInventory('fishing_rod', 1);
+            EventBus.emit('network-toast', { type: 'success', message: 'Purchased Fishing Rod!' });
             this.emitLocalStats();
         }
 
@@ -688,6 +707,7 @@ export class MainMap extends Phaser.Scene {
                     }
                 } else if (
                     obj.name === 'Chest' || 
+                    obj.name === 'chest' || 
                     obj.name === 'Top Ranking' || 
                     obj.name === 'Portal 1' || 
                     obj.name === 'Portal 2' ||
@@ -696,8 +716,9 @@ export class MainMap extends Phaser.Scene {
                     if (obj.x !== undefined && obj.y !== undefined && obj.width !== undefined && obj.height !== undefined) {
                         const centerX = obj.x + obj.width / 2;
                         const centerY = obj.y + obj.height / 2;
+                        const normalName = (obj.name === 'Chest' || obj.name === 'chest') ? 'Chest' : obj.name;
                         this.customInteractables.push({
-                            name: obj.name,
+                            name: normalName,
                             type: obj.type || '',
                             x: centerX,
                             y: centerY,
@@ -705,7 +726,7 @@ export class MainMap extends Phaser.Scene {
                             height: obj.height
                         });
 
-                        if (obj.name === 'Chest') {
+                        if (obj.name === 'Chest' || obj.name === 'chest') {
                             this.chestSprite = this.add.sprite(centerX, centerY, 'sunnyside_tileset_16px_sheet', 1968);
                             this.chestSprite.setDisplaySize(obj.width, obj.height);
                             this.chestSprite.setDepth(4);

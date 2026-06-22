@@ -252,14 +252,26 @@ export class Player extends Phaser.GameObjects.Container {
         const mainMap = this.scene as any;
         
         // 1. Check if has fishing rod in inventory
-        const hasRod = mainMap.localStats.inventory.find((i: any) => i.itemType === 'fishing_rod' && i.count > 0);
+        let hasRod = false;
+        let durability = 100;
+
+        if (mainMap.room) {
+            const selfPlayer = mainMap.room.state.players.get(mainMap.room.sessionId);
+            if (selfPlayer) {
+                hasRod = selfPlayer.inventory.some((i: any) => i.itemType === 'fishing_rod' && i.count > 0);
+                durability = selfPlayer.fishingRodDurability ?? 100;
+            }
+        } else {
+            hasRod = mainMap.localStats.inventory.some((i: any) => i.itemType === 'fishing_rod' && i.count > 0);
+            durability = mainMap.localStats.fishingRodDurability ?? 100;
+        }
+
         if (!hasRod) {
-            EventBus.emit('network-error', 'You need a Fishing Rod to fish!');
+            EventBus.emit('network-error', 'You need to buy a Fishing Rod from the Marketplace first!');
             return;
         }
 
         // 2. Check durability
-        const durability = mainMap.localStats.fishingRodDurability ?? 100;
         if (durability <= 0) {
             EventBus.emit('network-error', 'Your Fishing Rod is broken! Repair it at the Blacksmith.');
             return;
