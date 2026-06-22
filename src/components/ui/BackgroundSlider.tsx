@@ -42,7 +42,6 @@ export default function BackgroundSlider() {
             ))}
             {/* Dark/Gradient Overlay for readability */}
             <div className="absolute inset-0 bg-gradient-to-b from-gray-950/70 via-gray-950/40 to-gray-950/80 z-10" />
-            <div className="absolute inset-0 bg-[linear-gradient(to_right,#8080801a_1px,transparent_1px),linear-gradient(to_bottom,#8080801a_1px,transparent_1px)] bg-[size:24px_24px] z-10" />
         </div>
     );
 }

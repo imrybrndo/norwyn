@@ -1,10 +1,11 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useWallet } from '@solana/wallet-adapter-react';
+import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 import { WalletMultiButton, useWalletModal } from '@solana/wallet-adapter-react-ui';
 import { motion } from 'framer-motion';
-import { Sparkles, Gamepad2, ArrowRight, ShieldCheck } from 'lucide-react';
+import { Sparkles, Gamepad2, ArrowRight, ShieldCheck, AlertTriangle } from 'lucide-react';
+import { PublicKey } from '@solana/web3.js';
 import { Button } from './button';
 
 interface LandingHeroProps {
@@ -22,10 +23,13 @@ export default function LandingHero({
     onEnterGame,
     onEnterGameAsGuest,
 }: LandingHeroProps) {
+    const { connection } = useConnection();
     const { connected, publicKey } = useWallet();
     const { setVisible } = useWalletModal();
     const [mounted, setMounted] = useState(false);
     const [onlinePlayers, setOnlinePlayers] = useState(42);
+    const [tokenBalance, setTokenBalance] = useState<number | null>(null);
+    const [isCheckingToken, setIsCheckingToken] = useState(false);
 
     useEffect(() => {
         setMounted(true);
@@ -39,6 +43,45 @@ export default function LandingHero({
         }, 8000);
         return () => clearInterval(interval);
     }, []);
+
+    useEffect(() => {
+        const checkBalance = async () => {
+            if (!connected || !publicKey) {
+                setTokenBalance(null);
+                return;
+            }
+
+            const tokenCA = process.env.NEXT_PUBLIC_TOKEN_CA;
+            if (!tokenCA) {
+                // If no CA is configured, we can assume balance is sufficient or ignore check
+                setTokenBalance(Infinity);
+                return;
+            }
+
+            setIsCheckingToken(true);
+            try {
+                const mintPubKey = new PublicKey(tokenCA);
+                const response = await connection.getParsedTokenAccountsByOwner(publicKey, {
+                    mint: mintPubKey,
+                });
+
+                let totalAmount = 0;
+                for (const accountInfo of response.value) {
+                    const amountStr = accountInfo.account.data.parsed.info.tokenAmount.uiAmountString;
+                    totalAmount += parseFloat(amountStr) || 0;
+                }
+
+                setTokenBalance(totalAmount);
+            } catch (error) {
+                console.error('Error checking token balance:', error);
+                setTokenBalance(0);
+            } finally {
+                setIsCheckingToken(false);
+            }
+        };
+
+        checkBalance();
+    }, [connected, publicKey, connection]);
 
     const handlePlayNow = () => {
         if (!connected) {
@@ -60,17 +103,8 @@ export default function LandingHero({
                 transition={{ duration: 0.5, ease: 'easeOut' }}
                 className="w-full max-w-2xl z-10 flex flex-col items-center gap-4 md:gap-5"
             >
-                <div className="flex flex-wrap justify-center items-center gap-3">
-                    {/* Game Badge */}
-                    <motion.div
-                        initial={{ scale: 0.9, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        transition={{ delay: 0.2, type: 'spring' }}
-                        className="inline-flex items-center gap-2 px-4 py-1.5 bg-emerald-100 border border-slate-800 rounded-full text-emerald-800 text-[10px] md:text-xs font-bold uppercase tracking-wider shadow-[2px_2px_0_0_#1e293b]"
-                    >
-                        <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
-                        Web3 Cozy Farming Sim
-                    </motion.div>
+                <div className="justify-center items-center gap-3">
+
 
                     {/* Online Players Badge */}
                     <motion.div
@@ -93,7 +127,7 @@ export default function LandingHero({
                         Build Your <br />
                         <span className="text-emerald-400 drop-shadow-[0_2px_2px_rgba(0,0,0,0.3)]">Cozy Empire</span>
                     </h1>
-                    
+
                     <p className="text-slate-250 text-white text-xs md:text-sm font-bold max-w-lg mx-auto font-sans leading-relaxed drop-shadow-[0_2px_2px_rgba(0,0,0,0.5)]">
                         Plant crops 🌾 raise animals 🐮 catch fish 🎣 trade with friends, and start your Web3 farming adventure on Solana!
                     </p>
@@ -144,7 +178,23 @@ export default function LandingHero({
                                 </span>
                             </div>
 
-                            {isLoading ? (
+                            {isCheckingToken ? (
+                                <div className="text-emerald-400 font-pixel text-[9px] md:text-[10px] animate-pulse py-4">
+                                    Checking Token Balance...
+                                </div>
+                            ) : tokenBalance !== null && tokenBalance < Number(process.env.NEXT_PUBLIC_REQUIRED_TOKEN_AMOUNT || 400000) ? (
+                                <div className="flex flex-col items-center gap-3 w-full bg-red-950/40 border border-red-500/40 rounded-xl p-4">
+                                    <AlertTriangle className="w-8 h-8 text-red-500 mb-1" />
+                                    <p className="text-red-400 font-bold text-xs text-center">
+                                        Access Denied
+                                    </p>
+                                    <p className="text-slate-300 text-[10px] text-center">
+                                        You need at least {Number(process.env.NEXT_PUBLIC_REQUIRED_TOKEN_AMOUNT || 400000).toLocaleString()} Helge tokens to play.
+                                        <br />
+                                        Your balance: {tokenBalance.toLocaleString()}
+                                    </p>
+                                </div>
+                            ) : isLoading ? (
                                 <div className="text-emerald-400 font-pixel text-[9px] md:text-[10px] animate-pulse">
                                     Loading Character Profile...
                                 </div>
@@ -156,7 +206,7 @@ export default function LandingHero({
                                             Role: {userData.role} | Gold: {userData.gold} 💰
                                         </div>
                                     </div>
-                                    
+
                                     <button
                                         onClick={onEnterGame}
                                         className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-pixel text-[11px] md:text-xs rounded-2xl border-2 border-slate-950 shadow-[4px_4px_0_0_#000] active:translate-y-[2px] active:shadow-[2px_2px_0_0_#000] transition-all cursor-pointer flex items-center justify-center gap-2 font-bold"
