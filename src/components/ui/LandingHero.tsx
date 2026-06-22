@@ -33,14 +33,18 @@ export default function LandingHero({
 
     useEffect(() => {
         setMounted(true);
-        // Simulate online players fluctuation
-        setOnlinePlayers(Math.floor(Math.random() * 15) + 40);
-        const interval = setInterval(() => {
-            setOnlinePlayers(prev => {
-                const diff = Math.floor(Math.random() * 5) - 2; // -2 to +2
-                return Math.max(30, Math.min(80, prev + diff));
-            });
-        }, 8000);
+        const fetchOnlinePlayers = async () => {
+            try {
+                const res = await fetch('/api/online-count');
+                const data = await res.json();
+                setOnlinePlayers(data.online || 0);
+            } catch (err) {
+                console.error('Error fetching online count:', err);
+            }
+        };
+
+        fetchOnlinePlayers();
+        const interval = setInterval(fetchOnlinePlayers, 10000);
         return () => clearInterval(interval);
     }, []);
 
@@ -129,7 +133,7 @@ export default function LandingHero({
                     </h1>
 
                     <p className="text-slate-250 text-white text-xs md:text-sm font-bold max-w-lg mx-auto font-sans leading-relaxed drop-shadow-[0_2px_2px_rgba(0,0,0,0.5)]">
-                        Plant crops 🌾 raise animals 🐮 catch fish 🎣 trade with friends, and start your Web3 farming adventure on Solana!
+                        Plant crops 🌾 catch fish 🎣 and start your Web3 farming adventure on Solana!
                     </p>
                 </div>
 

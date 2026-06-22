@@ -397,7 +397,7 @@ export class MainMap extends Phaser.Scene {
         }
 
         else if (type === 'buyFishingRod') {
-            const price = 1000;
+            const price = 5000;
             if (this.localStats.gold < price) {
                 EventBus.emit('network-error', 'Not enough gold!');
                 return;
@@ -727,7 +727,7 @@ export class MainMap extends Phaser.Scene {
                         });
 
                         if (obj.name === 'Chest' || obj.name === 'chest') {
-                            this.chestSprite = this.add.sprite(centerX, centerY, 'sunnyside_tileset_16px_sheet', 1968);
+                            this.chestSprite = this.add.sprite(centerX, centerY, 'sunnyside_tileset_16px_sheet', 1958);
                             this.chestSprite.setDisplaySize(obj.width, obj.height);
                             this.chestSprite.setDepth(4);
                             this.updateChestVisibility();
@@ -1274,7 +1274,7 @@ export class MainMap extends Phaser.Scene {
         if (this.isChestClaimed) {
             this.chestSprite.setFrame(1959); // opened chest tile
         } else {
-            this.chestSprite.setFrame(1968); // closed chest tile
+            this.chestSprite.setFrame(1958); // closed chest tile
         }
     }
 

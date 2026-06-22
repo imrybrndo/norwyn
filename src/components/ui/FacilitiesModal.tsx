@@ -500,12 +500,12 @@ export default function FacilitiesModal() {
                                 ) : (
                                     <button 
                                         onClick={buyFishingRod}
-                                        disabled={stats.gold < 1000}
+                                        disabled={stats.gold < 5000}
                                         className={`px-4 py-2 rounded-xl text-sm font-extrabold cursor-pointer transition-all ${
-                                            stats.gold >= 1000 ? 'bg-amber-500 text-gray-950 hover:bg-amber-400 active:scale-95' : 'bg-gray-800 text-gray-600 cursor-not-allowed'
+                                            stats.gold >= 5000 ? 'bg-amber-500 text-gray-950 hover:bg-amber-400 active:scale-95' : 'bg-gray-800 text-gray-600 cursor-not-allowed'
                                         }`}
                                     >
-                                        Buy (1000 G)
+                                        Buy (5000 G)
                                     </button>
                                 )}
                             </div>

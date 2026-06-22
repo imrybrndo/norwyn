@@ -13,7 +13,7 @@ process.on('uncaughtException', (err) => {
 process.on('unhandledRejection', (reason, promise) => {
     console.error('Unhandled Rejection at:', promise, 'reason:', reason);
 });
-import { Server } from '@colyseus/core';
+import { Server, matchMaker } from '@colyseus/core';
 import { WebSocketTransport } from '@colyseus/ws-transport';
 import { connectDB } from './db/connect';
 import { GameRoom } from './rooms/GameRoom';
@@ -60,6 +60,17 @@ nextApp.prepare().then(async () => {
 
     // Define room
     gameServer.define('game_room', GameRoom);
+
+    // Online players route
+    app.get('/api/online-count', async (req, res) => {
+        try {
+            const rooms = await matchMaker.query({});
+            const count = rooms.reduce((acc, room) => acc + (room.clients || 0), 0);
+            res.json({ online: count });
+        } catch (e) {
+            res.json({ online: 0 });
+        }
+    });
 
     // Let Next.js handle all other routes
     app.use((req, res) => {

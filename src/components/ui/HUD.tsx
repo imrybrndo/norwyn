@@ -242,6 +242,18 @@ export default function HUD() {
                 e.preventDefault();
                 openFacilityMenu();
             }
+
+            // Tab key toggles backpack inventory
+            if (e.key === 'Tab') {
+                e.preventDefault();
+                setActiveModal(prev => prev === 'inventory' ? null : 'inventory');
+            }
+
+            // Escape key closes open modal or toggles settings
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                setActiveModal(prev => prev ? null : 'settings');
+            }
         };
 
         window.addEventListener('keydown', handleKeyDown);

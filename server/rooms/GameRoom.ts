@@ -438,7 +438,7 @@ export class GameRoom extends Room<{ state: GameState }> {
             const player = this.state.players.get(client.sessionId);
             if (!player) return;
 
-            const price = 1000;
+            const price = 5000;
             if (player.gold < price) {
                 client.send('error', 'Not enough gold to buy a Fishing Rod!');
                 return;
