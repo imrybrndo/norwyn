@@ -132,6 +132,29 @@ export class GameRoom extends Room<{ state: GameState }> {
     onCreate(options: any) {
         this.setState(new GameState());
 
+        // Initialize the 2 NPCs (Ed and Rey) in the room state so they are always counted as online players
+        const edState = new PlayerState();
+        edState.id = "npc_ed";
+        edState.username = "Guest_Ed";
+        edState.isGuest = true;
+        edState.clothesIndex = 2;
+        edState.level = 1;
+        edState.gold = 100;
+        edState.energy = 100;
+        edState.hunger = 100;
+        this.state.players.set("npc_ed", edState);
+
+        const reyState = new PlayerState();
+        reyState.id = "npc_rey";
+        reyState.username = "Guest_Rey";
+        reyState.isGuest = true;
+        reyState.clothesIndex = 3;
+        reyState.level = 1;
+        reyState.gold = 100;
+        reyState.energy = 100;
+        reyState.hunger = 100;
+        this.state.players.set("npc_rey", reyState);
+
         let tickCount = 0;
         this.setSimulationInterval(() => {
             tickCount++;

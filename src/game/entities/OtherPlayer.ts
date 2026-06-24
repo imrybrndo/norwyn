@@ -64,7 +64,7 @@ export class OtherPlayer extends Phaser.GameObjects.Container {
         scene.add.existing(this);
     }
 
-    update() {
+    update(time?: number, delta?: number) {
         if (this.isPerformingAction) return;
 
         // Smooth linear interpolation (lerp) to prevent jitter/teleportation

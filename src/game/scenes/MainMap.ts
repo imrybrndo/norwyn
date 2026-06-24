@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { Player } from '../entities/Player';
 import { OtherPlayer } from '../entities/OtherPlayer';
+import { NPC } from '../entities/NPC';
 import { createAnimations } from '../managers/AnimationManager';
 import { colyseusClient } from '../../network/colyseus';
 import { EventBus } from '../EventBus';
@@ -16,6 +17,7 @@ export class MainMap extends Phaser.Scene {
     
     room: Room<GameState> | null = null;
     otherPlayers: Map<string, OtherPlayer> = new Map();
+    npcs: NPC[] = [];
     bgmMusic?: Phaser.Sound.BaseSound;
     
     // Farming crop visual objects mapping: tileKey -> objects
@@ -892,6 +894,22 @@ export class MainMap extends Phaser.Scene {
             EventBus.emit('request-sound-status');
         });
 
+        // Spawn NPCs (Ed and Rey) with different clothes indexes for distinction
+        const ed = new NPC(this, 300, 300, 'Guest_Ed', 2);
+        const rey = new NPC(this, 500, 500, 'Guest_Rey', 3);
+        ed.setDepth(5);
+        rey.setDepth(5);
+        this.npcs = [ed, rey];
+
+        // Add collisions for NPCs
+        this.npcs.forEach(npc => {
+            this.physics.add.collider(npc, this.environmentLayer);
+            this.physics.add.collider(npc, this.groundLayer);
+            if (this.groundDetailLayer) {
+                this.physics.add.collider(npc, this.groundDetailLayer);
+            }
+        });
+
         // 8. Setup online multiplayer if selected
         if (isOnline) {
             this.connectToRoom(username, clothesIndex, walletAddress, isGuest);
@@ -969,6 +987,10 @@ export class MainMap extends Phaser.Scene {
                 if (obj.timer) obj.timer.destroy();
             });
             this.cropObjects.clear();
+
+            // Destroy and clean up NPCs
+            this.npcs.forEach(npc => npc.destroy());
+            this.npcs = [];
         });
     }
 
@@ -1024,6 +1046,12 @@ export class MainMap extends Phaser.Scene {
 
             // Handle new players joining
             callbacks.onAdd("players", (player: any, sessionId: string) => {
+                // Ignore virtual NPC guest players to prevent duplication
+                if (sessionId === 'npc_ed' || sessionId === 'npc_rey' || player.username === 'Guest_Ed' || player.username === 'Guest_Rey') {
+                    EventBus.emit('online-count-changed', room.state.players.size);
+                    return;
+                }
+
                 if (sessionId === room.sessionId) {
                     this.updateChestVisibility();
                 }
@@ -1219,7 +1247,10 @@ export class MainMap extends Phaser.Scene {
         }
 
         // Interpolate other players
-        this.otherPlayers.forEach(other => other.update());
+        this.otherPlayers.forEach(other => other.update(time, delta));
+
+        // Update NPCs
+        this.npcs.forEach(npc => npc.update(time, delta));
 
         // Update crop visual timers
         this.updateCropsVisuals();

@@ -15,6 +15,7 @@ interface LeaderboardEntry {
     username: string;
     level: number;
     gold: number;
+    playtime: number;
 }
 
 export default function LeaderboardPage() {
@@ -32,7 +33,8 @@ export default function LeaderboardPage() {
                         address: user.walletAddress ? `${user.walletAddress.substring(0, 6)}...${user.walletAddress.substring(user.walletAddress.length - 6)}` : 'Guest',
                         username: user.username || 'Anonymous',
                         level: user.level || 1,
-                        gold: user.gold || 0
+                        gold: user.gold || 0,
+                        playtime: user.totalPlaytime || 0
                     }));
                     setStandings(mapped);
                 }
@@ -56,6 +58,16 @@ export default function LeaderboardPage() {
             default:
                 return 'bg-slate-100 text-slate-600 border-slate-200';
         }
+    };
+
+    const formatPlaytime = (ms: number) => {
+        if (!ms) return '0m';
+        const minutes = Math.floor(ms / 60000);
+        const hours = Math.floor(minutes / 60);
+        if (hours > 0) {
+            return `${hours}h ${minutes % 60}m`;
+        }
+        return `${minutes}m`;
     };
 
     return (
@@ -103,19 +115,20 @@ export default function LeaderboardPage() {
                                             <TableHead className="font-bold text-slate-500 w-16">Rank</TableHead>
                                             <TableHead className="font-bold text-slate-500">Villager</TableHead>
                                             <TableHead className="font-bold text-slate-500 text-center w-24">Level</TableHead>
+                                            <TableHead className="font-bold text-slate-500 text-center w-32">Playtime</TableHead>
                                             <TableHead className="font-bold text-slate-500 text-right w-32">Gold Balance</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
                                         {isLoading ? (
                                             <TableRow>
-                                                <TableCell colSpan={4} className="text-center py-8 font-semibold text-slate-500">
+                                                <TableCell colSpan={5} className="text-center py-8 font-semibold text-slate-500">
                                                     Loading Leaderboard...
                                                 </TableCell>
                                             </TableRow>
                                         ) : standings.length === 0 ? (
                                             <TableRow>
-                                                <TableCell colSpan={4} className="text-center py-8 font-semibold text-slate-500">
+                                                <TableCell colSpan={5} className="text-center py-8 font-semibold text-slate-500">
                                                     No players found. Start playing to rank up!
                                                 </TableCell>
                                             </TableRow>
@@ -135,6 +148,9 @@ export default function LeaderboardPage() {
                                                     </TableCell>
                                                     <TableCell className="text-center font-bold text-slate-700 text-sm">
                                                         Lv. {user.level}
+                                                    </TableCell>
+                                                    <TableCell className="text-center font-bold text-slate-500 text-xs">
+                                                        {formatPlaytime(user.playtime || 0)}
                                                     </TableCell>
                                                     <TableCell className="text-right font-pixel text-[10px] text-amber-600 font-bold">
                                                         {user.gold.toLocaleString()}💰

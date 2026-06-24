@@ -17,6 +17,7 @@ import { Server, matchMaker } from '@colyseus/core';
 import { WebSocketTransport } from '@colyseus/ws-transport';
 import { connectDB } from './db/connect';
 import { GameRoom } from './rooms/GameRoom';
+import User from './db/models/User';
 
 const dev = process.env.NODE_ENV !== 'production';
 const port = parseInt(process.env.PORT || '3000', 10);
@@ -66,9 +67,11 @@ nextApp.prepare().then(async () => {
         try {
             const rooms = await matchMaker.query({});
             const count = rooms.reduce((acc, room) => acc + (room.clients || 0), 0);
-            res.json({ online: count });
+            const total = await User.countDocuments({});
+            // Add +2 to count representing the 2 permanently online guest NPCs (Guest_Ed and Guest_Rey)
+            res.json({ online: count + 2, total });
         } catch (e) {
-            res.json({ online: 0 });
+            res.json({ online: 2, total: 0 }); // Fallback to at least 2 online (our NPCs)
         }
     });
 

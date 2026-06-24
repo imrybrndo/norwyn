@@ -27,7 +27,8 @@ export default function LandingHero({
     const { connected, publicKey } = useWallet();
     const { setVisible } = useWalletModal();
     const [mounted, setMounted] = useState(false);
-    const [onlinePlayers, setOnlinePlayers] = useState(42);
+    const [onlinePlayers, setOnlinePlayers] = useState(0);
+    const [totalPlayers, setTotalPlayers] = useState(0);
     const [tokenBalance, setTokenBalance] = useState<number | null>(null);
     const [isCheckingToken, setIsCheckingToken] = useState(false);
 
@@ -37,7 +38,8 @@ export default function LandingHero({
             try {
                 const res = await fetch('/api/online-count');
                 const data = await res.json();
-                setOnlinePlayers(data.online || 0);
+                setOnlinePlayers(data.online ?? 0);
+                setTotalPlayers(data.total ?? 0);
             } catch (err) {
                 console.error('Error fetching online count:', err);
             }
@@ -121,7 +123,7 @@ export default function LandingHero({
                             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                             <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
                         </div>
-                        {onlinePlayers} Players Online
+                        {onlinePlayers} Online | {totalPlayers} Total Players
                     </motion.div>
                 </div>
 
@@ -238,13 +240,7 @@ export default function LandingHero({
                             )}
                         </div>
                     )}
-                </div>
-
-                {/* Specs Footer */}
-                <div className="flex justify-between w-full max-w-xs text-[10px] text-slate-500 font-bold mt-2">
-                    <span>Solana Devnet</span>
-                    <span>v0.2.0</span>
-                </div>
+                </div>        
             </motion.div>
         </div>
     );
