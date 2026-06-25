@@ -164,15 +164,15 @@ export default function LandingHero({
                             >
                                 PLAY NOW
                             </button>
-                            <button
+                            {/* <button
                                 onClick={onEnterGameAsGuest}
                                 className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-100 font-pixel text-xs rounded-2xl border-2 border-slate-950 shadow-[4px_4px_0_0_#000] active:translate-y-[2px] active:shadow-[2px_2px_0_0_#000] transition-all cursor-pointer font-bold tracking-wider"
                             >
                                 PLAY AS GUEST
-                            </button>
-                            <p className="text-slate-300 text-[10px] md:text-xs font-semibold mt-1 drop-shadow-[0_1px_1px_rgba(0,0,0,0.5)]">
+                            </button> */}
+                            {/* <p className="text-slate-300 text-[10px] md:text-xs font-semibold mt-1 drop-shadow-[0_1px_1px_rgba(0,0,0,0.5)]">
                                 Connect wallet to save progress, or play as guest (Level 1 limit)
-                            </p>
+                            </p> */}
                         </div>
                     ) : (
                         <div className="flex flex-col items-center gap-3 w-full">
