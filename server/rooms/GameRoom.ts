@@ -135,7 +135,7 @@ export class GameRoom extends Room<{ state: GameState }> {
         // Initialize the 2 NPCs (Ed and Rey) in the room state so they are always counted as online players
         const edState = new PlayerState();
         edState.id = "npc_ed";
-        edState.username = "Guest_Ed";
+        edState.username = "Guest_19804";
         edState.isGuest = true;
         edState.clothesIndex = 2;
         edState.level = 1;
@@ -146,7 +146,7 @@ export class GameRoom extends Room<{ state: GameState }> {
 
         const reyState = new PlayerState();
         reyState.id = "npc_rey";
-        reyState.username = "Guest_Rey";
+        reyState.username = "Guest_28193";
         reyState.isGuest = true;
         reyState.clothesIndex = 3;
         reyState.level = 1;

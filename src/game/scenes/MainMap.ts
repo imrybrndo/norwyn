@@ -895,8 +895,8 @@ export class MainMap extends Phaser.Scene {
         });
 
         // Spawn NPCs (Ed and Rey) with different clothes indexes for distinction
-        const ed = new NPC(this, 300, 300, 'Guest_Ed', 2);
-        const rey = new NPC(this, 500, 500, 'Guest_Rey', 3);
+        const ed = new NPC(this, 300, 300, 'Guest_19803', 2);
+        const rey = new NPC(this, 500, 500, 'Guest_28192', 3);
         ed.setDepth(5);
         rey.setDepth(5);
         this.npcs = [ed, rey];
@@ -1047,7 +1047,7 @@ export class MainMap extends Phaser.Scene {
             // Handle new players joining
             callbacks.onAdd("players", (player: any, sessionId: string) => {
                 // Ignore virtual NPC guest players to prevent duplication
-                if (sessionId === 'npc_ed' || sessionId === 'npc_rey' || player.username === 'Guest_Ed' || player.username === 'Guest_Rey') {
+                if (sessionId === 'npc_ed' || sessionId === 'npc_rey' || player.username === 'Guest_19803' || player.username === 'Guest_28192') {
                     EventBus.emit('online-count-changed', room.state.players.size);
                     return;
                 }
