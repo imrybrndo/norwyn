@@ -140,7 +140,7 @@ export default function LandingHero({
                 </div>
 
                 {/* Pixel Art Styled Floating Logo Icon */}
-                {/* <motion.div
+                <motion.div
                     animate={{ y: [0, -4, 0] }}
                     transition={{ repeat: Infinity, duration: 2.5, ease: 'easeInOut' }}
                     className="my-1 md:my-2"
@@ -150,7 +150,7 @@ export default function LandingHero({
                         <div className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-500 rounded-full border border-slate-800 animate-ping" />
                         <div className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-500 rounded-full border border-slate-800" />
                     </div>
-                </motion.div> */}
+                </motion.div> 
 
                 {/* Main CTA & Wallet Controls */}
                 <div className="flex flex-col items-center gap-3 w-full max-w-xs md:max-w-sm">
@@ -164,15 +164,15 @@ export default function LandingHero({
                             >
                                 PLAY NOW
                             </button>
-                            {/* <button
+                             <button
                                 onClick={onEnterGameAsGuest}
                                 className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-100 font-pixel text-xs rounded-2xl border-2 border-slate-950 shadow-[4px_4px_0_0_#000] active:translate-y-[2px] active:shadow-[2px_2px_0_0_#000] transition-all cursor-pointer font-bold tracking-wider"
                             >
                                 PLAY AS GUEST
                             </button> */}
-                            {/* <p className="text-slate-300 text-[10px] md:text-xs font-semibold mt-1 drop-shadow-[0_1px_1px_rgba(0,0,0,0.5)]">
+                            <p className="text-slate-300 text-[10px] md:text-xs font-semibold mt-1 drop-shadow-[0_1px_1px_rgba(0,0,0,0.5)]">
                                 Connect wallet to save progress, or play as guest (Level 1 limit)
-                            </p> */}
+                            </p> 
                         </div>
                     ) : (
                         <div className="flex flex-col items-center gap-3 w-full">
