@@ -1149,6 +1149,14 @@ export class MainMap extends Phaser.Scene {
                 }
             });
 
+            room.onMessage('private-chat-received', (data: any) => {
+                EventBus.emit('private-chat-received', data);
+            });
+
+            room.onMessage('private-chat-sent-confirm', (data: any) => {
+                EventBus.emit('private-chat-sent-confirm', data);
+            });
+
             // Listen to error notifications
             room.onMessage('error', (msg: string) => {
                 EventBus.emit('network-error', msg);

@@ -17,6 +17,7 @@ import {
     CheckCircle,
     User,
     Users,
+    MessageSquare,
     HelpCircle
 } from 'lucide-react';
 import PlaytimeRankingModal from './PlaytimeRankingModal';
@@ -129,6 +130,14 @@ export default function HUD() {
     // Hover Tooltip State
     const [hoveredItem, setHoveredItem] = useState<string | null>(null);
 
+    // Private Chat States
+    const [activeChatTab, setActiveChatTab] = useState<'global' | 'private'>('global');
+    const [activePrivateChat, setActivePrivateChat] = useState<string | null>(null);
+    const [privateMessages, setPrivateMessages] = useState<Record<string, Array<{ sender: string; text: string; timestamp: number }>>>({});
+    const [privateChatInputText, setPrivateChatInputText] = useState('');
+    const [unreadPrivateSenders, setUnreadPrivateSenders] = useState<string[]>([]);
+    const privateChatListRef = useRef<HTMLDivElement>(null);
+
     // Online Count
     const [onlineCount, setOnlineCount] = useState(1);
 
@@ -196,11 +205,41 @@ export default function HUD() {
             setRankingData(data);
         };
 
+        const handlePrivateChatReceived = (msg: { sender: string; text: string; timestamp: number }) => {
+            setPrivateMessages((prev) => {
+                const list = prev[msg.sender] || [];
+                return {
+                    ...prev,
+                    [msg.sender]: [...list, msg]
+                };
+            });
+            // Show toast/mark as unread if the private chat tab or window is not currently active
+            if (activeChatTab !== 'private' || activePrivateChat !== msg.sender) {
+                setUnreadPrivateSenders(prev => {
+                    if (prev.includes(msg.sender)) return prev;
+                    return [...prev, msg.sender];
+                });
+                onToast({ type: 'info', message: `New message from ${msg.sender}: "${msg.text}"` });
+            }
+        };
+
+        const handlePrivateChatSentConfirm = (msg: { receiver: string; text: string; timestamp: number }) => {
+            setPrivateMessages((prev) => {
+                const list = prev[msg.receiver] || [];
+                return {
+                    ...prev,
+                    [msg.receiver]: [...list, { sender: stats.username || 'Me', text: msg.text, timestamp: msg.timestamp }]
+                };
+            });
+        };
+
         EventBus.on('player-stats-changed', onStatsChanged);
         EventBus.on('near-facility', onNearFacility);
         EventBus.on('network-toast', onToast);
         EventBus.on('network-error', onError);
         EventBus.on('chat-received', handleChatReceived);
+        EventBus.on('private-chat-received', handlePrivateChatReceived);
+        EventBus.on('private-chat-sent-confirm', handlePrivateChatSentConfirm);
         EventBus.on('online-count-changed', handleOnlineCount);
         EventBus.on('open-playtime-ranking', onOpenRanking);
         EventBus.on('playtime-ranking-data', onRankingData);
@@ -270,12 +309,14 @@ export default function HUD() {
             EventBus.off('network-toast', onToast);
             EventBus.off('network-error', onError);
             EventBus.off('chat-received', handleChatReceived);
+            EventBus.off('private-chat-received', handlePrivateChatReceived);
+            EventBus.off('private-chat-sent-confirm', handlePrivateChatSentConfirm);
             EventBus.off('online-count-changed', handleOnlineCount);
             EventBus.off('open-playtime-ranking', onOpenRanking);
             EventBus.off('playtime-ranking-data', onRankingData);
             window.removeEventListener('keydown', handleKeyDown);
         };
-    }, [activeItem, nearFacility, stats.inventory, fishingState]);
+    }, [activeItem, nearFacility, stats.inventory, fishingState, activePrivateChat, activeChatTab]);
 
     useEffect(() => {
         EventBus.emit('toggle-sound', soundEnabled);
@@ -297,6 +338,54 @@ export default function HUD() {
             chatListRef.current.scrollTop = chatListRef.current.scrollHeight;
         }
     }, [chatMessages]);
+
+    useEffect(() => {
+        if (activePrivateChat) {
+            setUnreadPrivateSenders(prev => prev.filter(u => u !== activePrivateChat));
+        }
+    }, [activePrivateChat]);
+
+    useEffect(() => {
+        if (!activePrivateChat || !stats.username) return;
+
+        // Fetch chat history with this friend from API
+        fetch(`/api/chat?user=${encodeURIComponent(stats.username)}&friend=${encodeURIComponent(activePrivateChat)}`)
+            .then(res => res.json())
+            .then(data => {
+                if (Array.isArray(data)) {
+                    setPrivateMessages(prev => ({
+                        ...prev,
+                        [activePrivateChat]: data.map(msg => ({
+                            sender: msg.sender,
+                            text: msg.text,
+                            timestamp: new Date(msg.timestamp).getTime()
+                        }))
+                    }));
+                }
+            })
+            .catch(err => console.error('Error fetching chat history:', err));
+    }, [activePrivateChat, stats.username]);
+
+    useEffect(() => {
+        // Scroll to bottom of private chat
+        if (privateChatListRef.current) {
+            privateChatListRef.current.scrollTop = privateChatListRef.current.scrollHeight;
+        }
+    }, [privateMessages, activePrivateChat]);
+
+    const handleSendPrivateChat = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!privateChatInputText.trim() || !activePrivateChat) return;
+
+        EventBus.emit('send-room-message', {
+            type: 'sendPrivateChat',
+            payload: {
+                targetUsername: activePrivateChat,
+                text: privateChatInputText.trim()
+            }
+        });
+        setPrivateChatInputText('');
+    };
 
     const selectItem = (itemType: string) => {
         setActiveItem(itemType);
@@ -509,54 +598,188 @@ export default function HUD() {
             <div className="grid grid-cols-12 gap-4 items-end w-full">
                 
                 {/* Bottom-Left: Chat Log */}
-                <div className="col-span-3 bg-gray-900/80 border-4 border-slate-900 p-3 rounded-xl shadow-2xl pointer-events-auto flex flex-col gap-2 h-56 text-white retro-shadow">
-                    <div className="text-[9px] text-gray-400 uppercase border-b border-gray-800 pb-1 flex items-center justify-between font-bold">
-                        <span>💬 Village Chat</span>
-                        <span className="text-amber-500 animate-pulse text-[8px]">[ONLINE: {onlineCount}]</span>
-                    </div>
-
-                    <div 
-                        ref={chatListRef}
-                        className="flex-1 overflow-y-auto pr-1 flex flex-col gap-1.5 text-[9px] select-text scrollbar-thin scrollbar-thumb-gray-800"
-                    >
-                        {chatMessages.length === 0 ? (
-                            <div className="text-gray-500 italic mt-auto">Welcome to Chat! Type or press Enter...</div>
-                        ) : (
-                            chatMessages.map((msg, index) => (
-                                <div key={index} className="leading-relaxed break-words">
-                                    <span className="text-amber-400 font-bold">{msg.username}: </span>
-                                    <span className="text-gray-200">{msg.text}</span>
-                                </div>
-                            ))
-                        )}
-                    </div>
-
-                    <form onSubmit={handleChatSubmit} className="flex gap-2 border-t border-gray-800 pt-2">
-                        <input
-                            ref={chatInputRef}
-                            type="text"
-                            value={chatInputText}
-                            onChange={(e) => setChatInputText(e.target.value)}
-                            onFocus={handleChatFocus}
-                            onBlur={handleChatBlur}
-                            onKeyDown={(e) => {
-                                e.stopPropagation();
-                                handleChatKeyDown(e);
-                            }}
-                            onKeyUp={(e) => {
-                                e.stopPropagation();
-                            }}
-                            placeholder="Press Enter..."
-                            maxLength={80}
-                            className="flex-1 px-2 py-1.5 bg-slate-950 border-2 border-slate-800 rounded text-[9px] text-white focus:outline-none focus:border-amber-500 placeholder-gray-600 font-mono"
-                        />
+                <div className="col-span-3 bg-gray-900/80 border-4 border-slate-900 p-2.5 rounded-xl shadow-2xl pointer-events-auto flex flex-col gap-2 h-56 text-white retro-shadow">
+                    {/* Chat Tabs */}
+                    <div className="flex border-b border-gray-800 pb-1.5 text-[8px] font-bold uppercase gap-2">
                         <button 
-                            type="submit"
-                            className="p-1.5 bg-amber-600 hover:bg-amber-500 border-2 border-slate-900 text-white rounded cursor-pointer active:translate-y-[2px]"
+                            onClick={() => {
+                                setActiveChatTab('global');
+                            }}
+                            className={`pb-0.5 px-1 border-b-2 cursor-pointer transition-all ${
+                                activeChatTab === 'global' 
+                                    ? 'border-amber-500 text-amber-500' 
+                                    : 'border-transparent text-gray-400 hover:text-gray-200'
+                            }`}
                         >
-                            <Send className="w-3.5 h-3.5" />
+                            🌍 Global
                         </button>
-                    </form>
+                        <button 
+                            onClick={() => {
+                                setActiveChatTab('private');
+                            }}
+                            className={`pb-0.5 px-1 border-b-2 cursor-pointer relative transition-all ${
+                                activeChatTab === 'private' 
+                                    ? 'border-indigo-400 text-indigo-400' 
+                                    : 'border-transparent text-gray-400 hover:text-gray-200'
+                            }`}
+                        >
+                            ✉️ Private
+                            {unreadPrivateSenders.length > 0 && (
+                                <span className="absolute -top-1 -right-1.5 bg-red-650 text-white text-[5px] w-2.5 h-2.5 flex items-center justify-center rounded-full font-bold font-mono animate-pulse">
+                                    {unreadPrivateSenders.length}
+                                </span>
+                            )}
+                        </button>
+                        <span className="ml-auto text-slate-500 lowercase font-normal text-[7px] self-center">
+                            online: {onlineCount}
+                        </span>
+                    </div>
+
+                    {activeChatTab === 'global' ? (
+                        <>
+                            <div 
+                                ref={chatListRef}
+                                className="flex-1 overflow-y-auto pr-1 flex flex-col gap-1.5 text-[9px] select-text scrollbar-thin scrollbar-thumb-gray-800"
+                            >
+                                {chatMessages.length === 0 ? (
+                                    <div className="text-gray-500 italic mt-auto">Welcome to Chat! Type or press Enter...</div>
+                                ) : (
+                                    chatMessages.map((msg, index) => (
+                                        <div key={index} className="leading-relaxed break-words">
+                                            <span className="text-amber-400 font-bold">{msg.username}: </span>
+                                            <span className="text-gray-200">{msg.text}</span>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+
+                            <form onSubmit={handleChatSubmit} className="flex gap-2 border-t border-gray-800 pt-2">
+                                <input
+                                    ref={chatInputRef}
+                                    type="text"
+                                    value={chatInputText}
+                                    onChange={(e) => setChatInputText(e.target.value)}
+                                    onFocus={handleChatFocus}
+                                    onBlur={handleChatBlur}
+                                    onKeyDown={(e) => {
+                                        e.stopPropagation();
+                                        handleChatKeyDown(e);
+                                    }}
+                                    onKeyUp={(e) => {
+                                        e.stopPropagation();
+                                    }}
+                                    placeholder="Press Enter..."
+                                    maxLength={80}
+                                    className="flex-1 px-2 py-1.5 bg-slate-950 border-2 border-slate-800 rounded text-[9px] text-white focus:outline-none focus:border-amber-500 placeholder-gray-600 font-mono"
+                                />
+                                <button 
+                                    type="submit"
+                                    className="p-1.5 bg-amber-600 hover:bg-amber-500 border-2 border-slate-900 text-white rounded cursor-pointer active:translate-y-[2px]"
+                                >
+                                    <Send className="w-3.5 h-3.5" />
+                                </button>
+                            </form>
+                        </>
+                    ) : (
+                        // Private Chat Tab
+                        <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+                            {!activePrivateChat ? (
+                                // List of Friends to chat with
+                                <div className="flex-1 overflow-y-auto pr-1 flex flex-col gap-1.5 scrollbar-thin scrollbar-thumb-gray-800">
+                                    <div className="text-[7px] text-gray-505 mb-1 italic">Select a friend to message:</div>
+                                    {!stats.friends || stats.friends.length === 0 ? (
+                                        <div className="text-gray-500 italic text-center text-[8px] my-auto">No friends added yet.</div>
+                                    ) : (
+                                        stats.friends.map((friend) => {
+                                            const hasUnread = unreadPrivateSenders.includes(friend);
+                                            const friendMsgs = privateMessages[friend] || [];
+                                            const lastMsg = friendMsgs[friendMsgs.length - 1];
+                                            return (
+                                                <button
+                                                    key={friend}
+                                                    onClick={() => setActivePrivateChat(friend)}
+                                                    className={`flex items-center justify-between w-full p-1.5 rounded text-left border cursor-pointer transition-all ${
+                                                        hasUnread 
+                                                            ? 'bg-indigo-950/40 border-indigo-500/50 hover:bg-indigo-950/60' 
+                                                            : 'bg-slate-950/50 border-slate-800/60 hover:bg-slate-800/80'
+                                                    }`}
+                                                >
+                                                    <div className="flex flex-col min-w-0 flex-1">
+                                                        <span className={`text-[8.5px] font-bold ${hasUnread ? 'text-indigo-300' : 'text-gray-200'}`}>
+                                                            {friend}
+                                                        </span>
+                                                        <span className="text-[7px] text-gray-500 truncate pr-2">
+                                                            {lastMsg ? lastMsg.text : 'Click to start chat...'}
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex items-center gap-1.5">
+                                                        {hasUnread && (
+                                                            <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-ping" />
+                                                        )}
+                                                        <MessageSquare className="w-3 h-3 text-slate-500" />
+                                                    </div>
+                                                </button>
+                                            );
+                                        })
+                                    )}
+                                </div>
+                            ) : (
+                                // Active private chat conversation log
+                                <div className="flex-1 flex flex-col min-h-0">
+                                    <div className="flex items-center gap-1 border-b border-gray-800 pb-1 mb-1.5 text-[8.5px]">
+                                        <button 
+                                            onClick={() => setActivePrivateChat(null)}
+                                            className="text-indigo-400 hover:text-indigo-300 cursor-pointer font-bold mr-1"
+                                        >
+                                            ◀ Back
+                                        </button>
+                                        <span className="text-gray-200 font-bold">Chat: {activePrivateChat}</span>
+                                    </div>
+
+                                    <div 
+                                        ref={privateChatListRef}
+                                        className="flex-1 overflow-y-auto pr-1 flex flex-col gap-1.5 text-[9px] select-text scrollbar-thin scrollbar-thumb-gray-800 bg-slate-950/40 p-1.5 border border-slate-800/60 rounded"
+                                    >
+                                        {(!privateMessages[activePrivateChat] || privateMessages[activePrivateChat].length === 0) ? (
+                                            <div className="text-gray-500 italic text-center my-auto text-[8px]">No messages. Say hello!</div>
+                                        ) : (
+                                            privateMessages[activePrivateChat].map((msg, index) => {
+                                                const isSelf = msg.sender === stats.username;
+                                                return (
+                                                    <div key={index} className="leading-normal break-words">
+                                                        <span className={`font-bold ${isSelf ? 'text-indigo-400' : 'text-emerald-400'}`}>
+                                                            {msg.sender}: 
+                                                        </span>
+                                                        <span className="text-gray-200 ml-1">{msg.text}</span>
+                                                    </div>
+                                                );
+                                            })
+                                        )}
+                                    </div>
+
+                                    <form onSubmit={handleSendPrivateChat} className="flex gap-2 border-t border-gray-800 pt-2">
+                                        <input
+                                            type="text"
+                                            value={privateChatInputText}
+                                            onChange={(e) => setPrivateChatInputText(e.target.value)}
+                                            onFocus={() => EventBus.emit('disable-player-input')}
+                                            onBlur={() => EventBus.emit('enable-player-input')}
+                                            onKeyDown={(e) => e.stopPropagation()}
+                                            placeholder="Type message..."
+                                            maxLength={80}
+                                            className="flex-1 px-2 py-1 bg-slate-950 border-2 border-slate-800 rounded text-[9px] text-white focus:outline-none focus:border-indigo-500 placeholder-gray-600 font-mono"
+                                        />
+                                        <button 
+                                            type="submit"
+                                            className="p-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded cursor-pointer active:translate-y-[2px] flex items-center justify-center"
+                                        >
+                                            <Send className="w-3 h-3" />
+                                        </button>
+                                    </form>
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
 
                 {/* Bottom-Center: Hotbar */}
@@ -937,6 +1160,8 @@ export default function HUD() {
                                     <input 
                                         name="friendUsername"
                                         type="text" 
+                                        onFocus={() => EventBus.emit('disable-player-input')}
+                                        onBlur={() => EventBus.emit('enable-player-input')}
                                         placeholder="Enter username..." 
                                         className="flex-1 bg-slate-900 border-2 border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
                                     />
@@ -999,7 +1224,20 @@ export default function HUD() {
                                         {stats.friends.map((friendUser) => (
                                             <div key={friendUser} className="flex items-center justify-between bg-slate-900 px-3 py-2 rounded-lg border border-slate-850">
                                                 <span className="text-xs font-semibold text-gray-200">{friendUser}</span>
-                                                <span className="text-[10px] text-emerald-400 font-bold bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded">Friend</span>
+                                                <div className="flex items-center gap-2">
+                                                    <button
+                                                        onClick={() => {
+                                                            setActivePrivateChat(friendUser);
+                                                            setActiveChatTab('private');
+                                                            setActiveModal(null);
+                                                        }}
+                                                        className="p-1 hover:bg-slate-800 rounded text-indigo-400 cursor-pointer"
+                                                        title={`Chat with ${friendUser}`}
+                                                    >
+                                                        <MessageSquare className="w-3.5 h-3.5" />
+                                                    </button>
+                                                    <span className="text-[10px] text-emerald-400 font-bold bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded">Friend</span>
+                                                </div>
                                             </div>
                                         ))}
                                     </div>
@@ -1009,6 +1247,8 @@ export default function HUD() {
                     )}
                 </div>
             )}
+
+
 
             {/* --- 4. SLEEP OVERLAY --- */}
             {stats.isSleeping && (

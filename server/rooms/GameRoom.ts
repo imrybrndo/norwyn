@@ -1,6 +1,7 @@
 import { Room, Client } from '@colyseus/core';
 import { GameState, PlayerState, InventoryItemState, CropState } from './schema/GameState';
 import User from '../db/models/User';
+import Message from '../db/models/Message';
 
 // Helper to sync DB player stats to Colyseus schema state
 function syncPlayerState(player: PlayerState, user: any) {
@@ -1114,6 +1115,69 @@ export class GameRoom extends Room<{ state: GameState }> {
             } catch (e) {
                 console.error('Error rejecting friend request:', e);
                 client.send('toast', { type: 'error', message: 'Failed to reject friend request.' });
+            }
+        });
+
+        // Send Private Chat Message
+        this.onMessage('sendPrivateChat', async (client: Client, data: { targetUsername: string; text: string }) => {
+            const player = this.state.players.get(client.sessionId);
+            if (!player) return;
+
+            if (player.isGuest) {
+                client.send('toast', { type: 'error', message: 'Guest accounts cannot send private messages.' });
+                return;
+            }
+
+            const targetUsername = data.targetUsername?.trim();
+            const text = data.text?.trim();
+
+            if (!targetUsername || !text) {
+                client.send('toast', { type: 'error', message: 'Invalid message or recipient.' });
+                return;
+            }
+
+            // Check if they are friends in the player state
+            if (!player.friends.includes(targetUsername)) {
+                client.send('toast', { type: 'error', message: 'You can only message players who are on your friends list.' });
+                return;
+            }
+
+            try {
+                // Save private chat message to MongoDB
+                await Message.create({
+                    sender: player.username,
+                    receiver: targetUsername,
+                    text: text,
+                    timestamp: new Date()
+                });
+
+                // Find the target friend's client connection in the room if online
+                let targetOnlineClient: Client | undefined;
+                for (const [sid, p] of this.state.players.entries()) {
+                    if (p.username === targetUsername) {
+                        targetOnlineClient = this.clients.find(c => c.sessionId === sid);
+                        break;
+                    }
+                }
+
+                if (targetOnlineClient) {
+                    // Instantly push the message to the online friend
+                    targetOnlineClient.send('private-chat-received', {
+                        sender: player.username,
+                        text: text,
+                        timestamp: Date.now()
+                    });
+                }
+                
+                // Send confirmation/echo back to the sender
+                client.send('private-chat-sent-confirm', {
+                    receiver: targetUsername,
+                    text: text,
+                    timestamp: Date.now()
+                });
+            } catch (e) {
+                console.error('Error sending private message:', e);
+                client.send('toast', { type: 'error', message: 'Failed to send private message.' });
             }
         });
     }
