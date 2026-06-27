@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 import { WalletMultiButton, useWalletModal } from '@solana/wallet-adapter-react-ui';
 import { motion } from 'framer-motion';
-import { Sparkles, Gamepad2, ArrowRight, ShieldCheck, AlertTriangle } from 'lucide-react';
+import { Sparkles, Gamepad2, ArrowRight, ShieldCheck, AlertTriangle, Copy, Check } from 'lucide-react';
 import { PublicKey } from '@solana/web3.js';
 import { Button } from './button';
 
@@ -31,6 +31,19 @@ export default function LandingHero({
     const [totalPlayers, setTotalPlayers] = useState(0);
     const [tokenBalance, setTokenBalance] = useState<number | null>(null);
     const [isCheckingToken, setIsCheckingToken] = useState(false);
+    const [copied, setCopied] = useState(false);
+
+    const contractAddress = process.env.NEXT_PUBLIC_TOKEN_CA || '3XQ3DEkgy8mPe8Sz97degTmtntJWbm7tiDhh1kMupump';
+
+    const handleCopyCA = async () => {
+        try {
+            await navigator.clipboard.writeText(contractAddress);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1500);
+        } catch (err) {
+            console.error('Failed to copy contract address:', err);
+        }
+    };
 
     useEffect(() => {
         setMounted(true);
@@ -137,20 +150,22 @@ export default function LandingHero({
                     <p className="text-slate-250 text-white text-xs md:text-sm font-bold max-w-lg mx-auto font-sans leading-relaxed drop-shadow-[0_2px_2px_rgba(0,0,0,0.5)]">
                         Plant crops 🌾 catch fish 🎣 and start your Web3 farming adventure on Solana!
                     </p>
-                </div>
 
-                {/* Pixel Art Styled Floating Logo Icon */}
-                {/* <motion.div
-                    animate={{ y: [0, -4, 0] }}
-                    transition={{ repeat: Infinity, duration: 2.5, ease: 'easeInOut' }}
-                    className="my-1 md:my-2"
-                >
-                    <div className="relative w-14 h-14 md:w-16 md:h-16 bg-slate-900/80 border-2 border-slate-700 rounded-2xl flex items-center justify-center shadow-[4px_4px_0_0_#000]">
-                        <Gamepad2 className="w-6 h-6 md:w-8 md:h-8 text-amber-400" />
-                        <div className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-500 rounded-full border border-slate-800 animate-ping" />
-                        <div className="absolute -top-1 -right-1 w-3 h-3 bg-emerald-500 rounded-full border border-slate-800" />
-                    </div>
-                </motion.div> */}
+                    {/* Contract Address (CA) */}
+                    <button
+                        onClick={handleCopyCA}
+                        title="Copy contract address"
+                        className="group inline-flex items-center gap-2 max-w-full px-3 py-1.5 bg-slate-900/80 border border-slate-700 rounded-xl text-slate-200 shadow-[2px_2px_0_0_#000] hover:border-emerald-500/60 active:translate-y-[1px] active:shadow-none transition-all cursor-pointer"
+                    >
+                        <span className="text-[9px] md:text-[10px] font-bold uppercase tracking-wider text-emerald-400 shrink-0">CA</span>
+                        <span className="font-mono text-[10px] md:text-xs truncate">{contractAddress}</span>
+                        {copied ? (
+                            <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                        ) : (
+                            <Copy className="w-3.5 h-3.5 text-slate-400 group-hover:text-white shrink-0" />
+                        )}
+                    </button>
+                </div>
 
                 {/* Main CTA & Wallet Controls */}
                 <div className="flex flex-col items-center gap-3 w-full max-w-xs md:max-w-sm">
@@ -164,15 +179,15 @@ export default function LandingHero({
                             >
                                 PLAY NOW
                             </button>
-                            {/* <button
+                             <button
                                 onClick={onEnterGameAsGuest}
                                 className="w-full py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-100 font-pixel text-xs rounded-2xl border-2 border-slate-950 shadow-[4px_4px_0_0_#000] active:translate-y-[2px] active:shadow-[2px_2px_0_0_#000] transition-all cursor-pointer font-bold tracking-wider"
                             >
                                 PLAY AS GUEST
-                            </button> */}
-                            {/* <p className="text-slate-300 text-[10px] md:text-xs font-semibold mt-1 drop-shadow-[0_1px_1px_rgba(0,0,0,0.5)]">
+                            </button>
+                            <p className="text-slate-300 text-[10px] md:text-xs font-semibold mt-1 drop-shadow-[0_1px_1px_rgba(0,0,0,0.5)]">
                                 Connect wallet to save progress, or play as guest (Level 1 limit)
-                            </p> */}
+                            </p> 
                         </div>
                     ) : (
                         <div className="flex flex-col items-center gap-3 w-full">

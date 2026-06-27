@@ -17,8 +17,12 @@ export const SolanaProvider: FC<{ children: React.ReactNode }> = ({ children }) 
     // The network can be set to 'devnet', 'testnet', or 'mainnet-beta'.
     const network = (process.env.NEXT_PUBLIC_SOLANA_NETWORK || 'devnet') as WalletAdapterNetwork;
 
-    // You can also provide a custom RPC endpoint.
-    const endpoint = useMemo(() => clusterApiUrl(network), [network]);
+    // Prefer a custom RPC endpoint (env) — the public clusterApiUrl rate-limits
+    // and often rejects token-account queries, which breaks balance checks.
+    const endpoint = useMemo(
+        () => process.env.NEXT_PUBLIC_RPC_URL || clusterApiUrl(network),
+        [network]
+    );
 
     const wallets = useMemo(
         () => [
