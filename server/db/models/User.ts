@@ -34,6 +34,8 @@ export interface IUser extends Document {
     last_coordinates?: { x: number; y: number; map: string; }; // snake_case compatibility
     lastDailyChestClaim: number;
     totalPlaytime: number;
+    friends: string[];
+    friendRequests: string[];
     createdAt: Date;
     updatedAt: Date;
 }
@@ -85,7 +87,9 @@ const UserSchema: Schema = new Schema({
         y: { type: Number, default: 240 }
     },
     lastDailyChestClaim: { type: Number, default: 0 },
-    totalPlaytime: { type: Number, default: 0 }
+    totalPlaytime: { type: Number, default: 0 },
+    friends: { type: [String], default: [] },
+    friendRequests: { type: [String], default: [] }
 }, { timestamps: true });
 
 // Pre-save hook to keep snake_case and camelCase parameters synchronized

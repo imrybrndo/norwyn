@@ -39,6 +39,20 @@ function syncPlayerState(player: PlayerState, user: any) {
     }
 
     player.lastDailyChestClaim = user.lastDailyChestClaim ?? 0;
+
+    player.friends.clear();
+    if (user.friends) {
+        user.friends.forEach((friend: string) => {
+            player.friends.push(friend);
+        });
+    }
+
+    player.friendRequests.clear();
+    if (user.friendRequests) {
+        user.friendRequests.forEach((req: string) => {
+            player.friendRequests.push(req);
+        });
+    }
 }
 
 // Helper to save current Colyseus player state to DB
@@ -915,6 +929,191 @@ export class GameRoom extends Room<{ state: GameState }> {
             } catch (e) {
                 console.error('Error fetching playtime ranking:', e);
                 client.send('error', 'Failed to load ranking leaderboard.');
+            }
+        });
+
+        // Send Friend Request
+        this.onMessage('sendFriendRequest', async (client: Client, data: { targetUsername: string }) => {
+            const player = this.state.players.get(client.sessionId);
+            if (!player) return;
+
+            if (player.isGuest) {
+                client.send('toast', { type: 'error', message: 'Guest accounts cannot use the Friend system.' });
+                return;
+            }
+
+            const targetUsername = data.targetUsername?.trim();
+            if (!targetUsername) {
+                client.send('toast', { type: 'error', message: 'Invalid username.' });
+                return;
+            }
+
+            if (targetUsername.toLowerCase() === player.username.toLowerCase()) {
+                client.send('toast', { type: 'error', message: 'You cannot add yourself as a friend.' });
+                return;
+            }
+
+            try {
+                const targetUser = await User.findOne({ username: { $regex: new RegExp(`^${targetUsername}$`, 'i') } });
+                if (!targetUser) {
+                    client.send('toast', { type: 'error', message: `Player "${targetUsername}" not found.` });
+                    return;
+                }
+
+                const resolvedTargetUsername = targetUser.username;
+
+                if (player.friends.includes(resolvedTargetUsername)) {
+                    client.send('toast', { type: 'warning', message: `You are already friends with ${resolvedTargetUsername}.` });
+                    return;
+                }
+
+                if (targetUser.friendRequests.includes(player.username)) {
+                    client.send('toast', { type: 'warning', message: `Friend request already sent to ${resolvedTargetUsername}.` });
+                    return;
+                }
+
+                if (player.friendRequests.includes(resolvedTargetUsername)) {
+                    client.send('toast', { type: 'info', message: `${resolvedTargetUsername} has already sent you a friend request. Accept it instead!` });
+                    return;
+                }
+
+                targetUser.friendRequests.push(player.username);
+                await targetUser.save();
+
+                // Find online player state in this room
+                let targetOnlinePlayer: PlayerState | undefined;
+                let targetOnlineClient: Client | undefined;
+                for (const [sid, p] of this.state.players.entries()) {
+                    if (p.username === resolvedTargetUsername) {
+                        targetOnlinePlayer = p;
+                        targetOnlineClient = this.clients.find(c => c.sessionId === sid);
+                        break;
+                    }
+                }
+
+                if (targetOnlinePlayer && targetOnlineClient) {
+                    targetOnlinePlayer.friendRequests.push(player.username);
+                    targetOnlineClient.send('toast', { type: 'info', message: `You received a friend request from ${player.username}!` });
+                }
+
+                client.send('toast', { type: 'success', message: `Friend request sent to ${resolvedTargetUsername}!` });
+            } catch (e) {
+                console.error('Error sending friend request:', e);
+                client.send('toast', { type: 'error', message: 'Failed to send friend request.' });
+            }
+        });
+
+        // Accept Friend Request
+        this.onMessage('acceptFriendRequest', async (client: Client, data: { requesterUsername: string }) => {
+            const player = this.state.players.get(client.sessionId);
+            if (!player) return;
+
+            if (player.isGuest) {
+                client.send('toast', { type: 'error', message: 'Guest accounts cannot use the Friend system.' });
+                return;
+            }
+
+            const requesterUsername = data.requesterUsername?.trim();
+            if (!requesterUsername) return;
+
+            try {
+                const currentUserQuery = player.walletAddress 
+                    ? { walletAddress: player.walletAddress } 
+                    : { username: player.username };
+                const currentUser = await User.findOne(currentUserQuery);
+                if (!currentUser) {
+                    client.send('toast', { type: 'error', message: 'Your account was not found.' });
+                    return;
+                }
+
+                const requesterUser = await User.findOne({ username: { $regex: new RegExp(`^${requesterUsername}$`, 'i') } });
+                if (!requesterUser) {
+                    client.send('toast', { type: 'error', message: `Player "${requesterUsername}" not found.` });
+                    return;
+                }
+
+                const resolvedRequesterUsername = requesterUser.username;
+
+                currentUser.friendRequests = currentUser.friendRequests.filter((name: string) => name !== resolvedRequesterUsername);
+                if (!currentUser.friends.includes(resolvedRequesterUsername)) {
+                    currentUser.friends.push(resolvedRequesterUsername);
+                }
+                await currentUser.save();
+
+                if (!requesterUser.friends.includes(player.username)) {
+                    requesterUser.friends.push(player.username);
+                }
+                requesterUser.friendRequests = requesterUser.friendRequests.filter((name: string) => name !== player.username);
+                await requesterUser.save();
+
+                // Update current player state in room
+                const reqIndex = player.friendRequests.indexOf(resolvedRequesterUsername);
+                if (reqIndex !== -1) player.friendRequests.splice(reqIndex, 1);
+                if (!player.friends.includes(resolvedRequesterUsername)) {
+                    player.friends.push(resolvedRequesterUsername);
+                }
+
+                // Check if requester is online in room
+                let requesterOnlinePlayer: PlayerState | undefined;
+                let requesterOnlineClient: Client | undefined;
+                for (const [sid, p] of this.state.players.entries()) {
+                    if (p.username === resolvedRequesterUsername) {
+                        requesterOnlinePlayer = p;
+                        requesterOnlineClient = this.clients.find(c => c.sessionId === sid);
+                        break;
+                    }
+                }
+
+                if (requesterOnlinePlayer && requesterOnlineClient) {
+                    if (!requesterOnlinePlayer.friends.includes(player.username)) {
+                        requesterOnlinePlayer.friends.push(player.username);
+                    }
+                    const selfIndex = requesterOnlinePlayer.friendRequests.indexOf(player.username);
+                    if (selfIndex !== -1) requesterOnlinePlayer.friendRequests.splice(selfIndex, 1);
+
+                    requesterOnlineClient.send('toast', { type: 'success', message: `${player.username} accepted your friend request!` });
+                }
+
+                client.send('toast', { type: 'success', message: `You are now friends with ${resolvedRequesterUsername}!` });
+            } catch (e) {
+                console.error('Error accepting friend request:', e);
+                client.send('toast', { type: 'error', message: 'Failed to accept friend request.' });
+            }
+        });
+
+        // Reject Friend Request
+        this.onMessage('rejectFriendRequest', async (client: Client, data: { requesterUsername: string }) => {
+            const player = this.state.players.get(client.sessionId);
+            if (!player) return;
+
+            if (player.isGuest) {
+                client.send('toast', { type: 'error', message: 'Guest accounts cannot use the Friend system.' });
+                return;
+            }
+
+            const requesterUsername = data.requesterUsername?.trim();
+            if (!requesterUsername) return;
+
+            try {
+                const currentUserQuery = player.walletAddress 
+                    ? { walletAddress: player.walletAddress } 
+                    : { username: player.username };
+                const currentUser = await User.findOne(currentUserQuery);
+                if (!currentUser) {
+                    client.send('toast', { type: 'error', message: 'Your account was not found.' });
+                    return;
+                }
+
+                currentUser.friendRequests = currentUser.friendRequests.filter((name: string) => name !== requesterUsername);
+                await currentUser.save();
+
+                const reqIndex = player.friendRequests.indexOf(requesterUsername);
+                if (reqIndex !== -1) player.friendRequests.splice(reqIndex, 1);
+
+                client.send('toast', { type: 'info', message: `Rejected friend request from ${requesterUsername}.` });
+            } catch (e) {
+                console.error('Error rejecting friend request:', e);
+                client.send('toast', { type: 'error', message: 'Failed to reject friend request.' });
             }
         });
     }

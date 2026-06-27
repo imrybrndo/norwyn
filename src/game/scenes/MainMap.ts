@@ -338,7 +338,9 @@ export class MainMap extends Phaser.Scene {
             inventory: this.localStats.inventory.map(i => ({
                 itemType: i.itemType,
                 count: i.count
-            }))
+            })),
+            friends: [],
+            friendRequests: []
         });
     }
 
@@ -1074,7 +1076,9 @@ export class MainMap extends Phaser.Scene {
                                 itemType: item.itemType,
                                 count: item.count
                             })),
-                            lastClaimedQuests: Object.fromEntries(player.lastClaimedQuests || new Map())
+                            lastClaimedQuests: Object.fromEntries(player.lastClaimedQuests || new Map()),
+                            friends: player.friends ? Array.from(player.friends) : [],
+                            friendRequests: player.friendRequests ? Array.from(player.friendRequests) : []
                         });
                         this.updateChestVisibility();
                         return;
