@@ -141,6 +141,25 @@
   box-shadow: 4px 4px 0px 0px #047857;
 }
 
+/* Thin horizontal scrollbar for the bottom hotbar when items overflow */
+.hotbar-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #475569 transparent;
+}
+.hotbar-scroll::-webkit-scrollbar {
+  height: 6px;
+}
+.hotbar-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.hotbar-scroll::-webkit-scrollbar-thumb {
+  background-color: #475569;
+  border-radius: 9999px;
+}
+.hotbar-scroll::-webkit-scrollbar-thumb:hover {
+  background-color: #64748b;
+}
+
 /* Custom styles for Solana Wallet Adapter buttons to fit the cozy pixel aesthetic */
 .wallet-adapter-button {
   font-family: var(--font-inter), sans-serif !important;

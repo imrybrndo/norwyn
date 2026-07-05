@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { EventBus } from '../../game/EventBus';
+import { CROP_CATALOG } from '../../../shared/crops';
 
 interface InventoryItem {
     itemType: string;
@@ -34,7 +35,7 @@ export default function FacilitiesModal() {
     });
 
     const [activeFacility, setActiveFacility] = useState<string | null>(null);
-    const [shopTab, setShopTab] = useState<'buy' | 'sell'>('buy');
+    const [shopTab, setShopTab] = useState<'buy' | 'seeds' | 'sell'>('buy');
     const [selectedRepairTool, setSelectedRepairTool] = useState<'watering_can' | 'fishing_rod'>('watering_can');
     const [confirmSell, setConfirmSell] = useState<{
         cropType: string;
@@ -84,6 +85,10 @@ export default function FacilitiesModal() {
     // Actions
     const buySeedPack = () => {
         EventBus.emit('send-room-message', { type: 'buySeed' });
+    };
+
+    const buySeedSpecific = (cropType: string, count: number = 1) => {
+        EventBus.emit('send-room-message', { type: 'buySeedSpecific', payload: { cropType, count } });
     };
 
     const sellCrop = (cropType: string, count: number) => {
@@ -142,14 +147,20 @@ export default function FacilitiesModal() {
                     {activeFacility === 'shop' && (
                         <div>
                             {/* Tab Select */}
-                            <div className="flex bg-gray-950 p-1.5 rounded-xl border border-gray-800 mb-6">
-                                <button 
+                            <div className="flex bg-gray-950 p-1.5 rounded-xl border border-gray-800 mb-6 gap-1">
+                                <button
                                     onClick={() => { setShopTab('buy'); setConfirmSell(null); }}
                                     className={`flex-1 py-2 rounded-lg font-bold text-sm transition-all cursor-pointer ${shopTab === 'buy' ? 'bg-amber-500 text-gray-950' : 'text-gray-400 hover:text-white'}`}
                                 >
                                     Buy Pack
                                 </button>
-                                <button 
+                                <button
+                                    onClick={() => { setShopTab('seeds'); setConfirmSell(null); }}
+                                    className={`flex-1 py-2 rounded-lg font-bold text-sm transition-all cursor-pointer ${shopTab === 'seeds' ? 'bg-amber-500 text-gray-950' : 'text-gray-400 hover:text-white'}`}
+                                >
+                                    Buy Seeds
+                                </button>
+                                <button
                                     onClick={() => { setShopTab('sell'); setConfirmSell(null); }}
                                     className={`flex-1 py-2 rounded-lg font-bold text-sm transition-all cursor-pointer ${shopTab === 'sell' ? 'bg-amber-500 text-gray-950' : 'text-gray-400 hover:text-white'}`}
                                 >
@@ -198,16 +209,58 @@ export default function FacilitiesModal() {
                                         )}
                                     </div>
                                 </div>
+                            ) : shopTab === 'seeds' ? (
+                                <div className="flex flex-col gap-3">
+                                    <p className="text-xs text-gray-400 text-center mb-1">Buy the exact seed you want to plant</p>
+                                    {CROP_CATALOG.map(crop => {
+                                        const owned = getInventoryCount(`seed_${crop.id}`);
+                                        const canBuy1 = stats.gold >= crop.buyPrice;
+                                        const canBuy10 = stats.gold >= crop.buyPrice * 10;
+                                        return (
+                                            <div key={crop.id} className="flex items-center justify-between bg-gray-950 p-3.5 rounded-xl border border-gray-800">
+                                                <div className="flex items-center gap-3">
+                                                    {crop.image ? (
+                                                        <img src={crop.image} className="w-8 h-8 object-contain [image-rendering:pixelated]" alt={crop.name} />
+                                                    ) : (
+                                                        <span className="text-2xl">{crop.emoji}</span>
+                                                    )}
+                                                    <div>
+                                                        <h4 className="font-bold">{crop.name}</h4>
+                                                        <p className="text-xs text-gray-400">Buy: {crop.buyPrice} G · Sells for {crop.sellPrice} G</p>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-xs font-mono text-gray-400 mr-1">Seeds: {owned}</span>
+                                                    <button
+                                                        onClick={() => buySeedSpecific(crop.id, 1)}
+                                                        disabled={!canBuy1}
+                                                        className={`px-3 py-1.5 rounded-lg text-xs font-extrabold cursor-pointer ${
+                                                            canBuy1 ? 'bg-amber-500 text-gray-950 hover:bg-amber-400' : 'bg-gray-800 text-gray-600 cursor-not-allowed'
+                                                        }`}
+                                                    >
+                                                        Buy 1
+                                                    </button>
+                                                    <button
+                                                        onClick={() => buySeedSpecific(crop.id, 10)}
+                                                        disabled={!canBuy10}
+                                                        className={`px-3 py-1.5 rounded-lg text-xs font-extrabold cursor-pointer ${
+                                                            canBuy10 ? 'bg-amber-600 text-white hover:bg-amber-500' : 'bg-gray-800 text-gray-600 cursor-not-allowed'
+                                                        }`}
+                                                    >
+                                                        Buy 10
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
                             ) : (
                                 <div className="flex flex-col gap-3">
                                     {[
-                                        { type: 'rice', name: 'Rice', image: '/padi.png', price: 2 },
-                                        { type: 'vegetable', name: 'Vegy', emoji: '🥬', price: 50 },
-                                        { type: 'fruit', name: 'Apple', emoji: '🍎', price: 100 },
-                                        { type: 'golden_tree', name: 'Golden Tree Wood', emoji: '⭐', price: 200 },
-                                        { type: 'fish_common', name: 'Common Fish', emoji: '🐟', price: 25 },
-                                        { type: 'fish_uncommon', name: 'Uncommon Fish', emoji: '🐠', price: 60 },
-                                        { type: 'fish_rare', name: 'Rare Fish', emoji: '🐡', price: 150 }
+                                        ...CROP_CATALOG.map(c => ({ type: c.id, name: c.name, image: c.image, emoji: c.emoji, price: c.sellPrice })),
+                                        { type: 'fish_common', name: 'Common Fish', emoji: '🐟', image: undefined, price: 25 },
+                                        { type: 'fish_uncommon', name: 'Uncommon Fish', emoji: '🐠', image: undefined, price: 60 },
+                                        { type: 'fish_rare', name: 'Rare Fish', emoji: '🐡', image: undefined, price: 150 }
                                     ].map(crop => {
                                         const count = getInventoryCount(crop.type.startsWith('fish_') ? crop.type : `crop_${crop.type}`);
                                         return (

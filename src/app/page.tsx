@@ -8,8 +8,6 @@ import HUD from '../components/ui/HUD';
 import FacilitiesModal from '../components/ui/FacilitiesModal';
 import LandingHero from '../components/ui/LandingHero';
 import OnboardingFlow from '../components/ui/OnboardingFlow';
-import Navbar from '../components/ui/Navbar';
-import FeaturesBento from '../components/ui/FeaturesBento';
 import BackgroundSlider from '../components/ui/BackgroundSlider';
 
 export default function Home() {
@@ -134,7 +132,8 @@ export default function Home() {
         setGameState({
             inGame: true,
             username: userData.username,
-            clothesIndex: userData.clothesIndex,
+            // The API returns the Prisma user, whose field is avatarStyle
+            clothesIndex: userData.avatarStyle ?? 1,
             walletAddress: publicKey.toBase58(),
             isOnline: true,
             isGuest: false
@@ -168,20 +167,29 @@ export default function Home() {
                         </div>
                     ) : (
                         <div className="flex flex-col h-full w-full justify-between overflow-hidden">
-                            <Navbar />
-                            <LandingHero 
+                            <LandingHero
                                 userData={userData}
                                 isLoading={isLoadingUser}
                                 onStartOnboarding={handleStartOnboarding}
                                 onEnterGame={handleEnterGame}
                                 onEnterGameAsGuest={handleEnterGameAsGuest}
                             />
-                            <footer className="w-full border-t border-slate-200/10 py-4 text-center text-xs text-slate-400 font-bold bg-white/5 backdrop-blur-sm relative flex items-center justify-center">
-                                <span>&copy; {new Date().getFullYear()} Helge Village. All Rights Reserved. Built on Solana.</span>
-                                
-                                <button 
+                            <footer className="w-full border-t border-white/10 py-3.5 text-center text-[11px] text-slate-300 font-bold bg-slate-950/40 backdrop-blur-sm relative flex items-center justify-center gap-2">
+                                <span className="drop-shadow-[0_1px_1px_rgba(0,0,0,0.6)]">
+                                    &copy; {new Date().getFullYear()} Helge Village
+                                    <span className="hidden sm:inline text-slate-500"> · </span>
+                                    <span className="hidden sm:inline">All Rights Reserved</span>
+                                    <span className="text-slate-500"> · </span>
+                                    <span className="text-emerald-400">Built on Solana</span>
+                                </span>
+
+                                <button
                                     onClick={toggleSound}
-                                    className="absolute right-4 bg-slate-800/80 hover:bg-slate-700 p-2 rounded-full border border-slate-600 text-amber-400 transition-colors shadow-[2px_2px_0_0_#000] active:translate-y-[1px] active:shadow-none"
+                                    className={`absolute right-4 p-2 rounded-full border-2 border-slate-900 transition-all shadow-[2px_2px_0_0_#000] active:translate-y-[1px] active:shadow-none ${
+                                        isSoundActive
+                                            ? 'bg-amber-400 hover:bg-amber-300 text-slate-900'
+                                            : 'bg-slate-800/90 hover:bg-slate-700 text-amber-400'
+                                    }`}
                                     title={isSoundActive ? "Mute Sound" : "Play Sound"}
                                 >
                                     {isSoundActive ? <Volume2 size={16} /> : <VolumeX size={16} />}

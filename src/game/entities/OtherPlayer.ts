@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { ANSEM_STYLE_INDEX, ANSEM_SCALE, ANSEM_Y_OFFSET, ANSEM_FACES_LEFT } from './Player';
 
 export class OtherPlayer extends Phaser.GameObjects.Container {
     bodySprite: Phaser.GameObjects.Sprite;
@@ -15,19 +16,27 @@ export class OtherPlayer extends Phaser.GameObjects.Container {
     isPerformingAction: boolean = false;
     clothesIndex: number = 1;
 
+    isAnsem: boolean = false;
+
     constructor(scene: Phaser.Scene, x: number, y: number, username: string, clothesIndex: number) {
         super(scene, x, y);
         this.targetX = x;
         this.targetY = y;
         this.clothesIndex = clothesIndex;
+        this.isAnsem = clothesIndex === ANSEM_STYLE_INDEX;
 
-        // Base Body Layer
-        this.bodySprite = scene.add.sprite(0, 0, 'player_base_idle', 0);
+        // Base Body Layer (Ansem is a standalone sprite with no clothes overlay)
+        this.bodySprite = scene.add.sprite(0, 0, this.isAnsem ? 'ansem_idle' : 'player_base_idle', 0);
         this.bodySprite.setOrigin(0.5, 0.5);
+        if (this.isAnsem) {
+            this.bodySprite.setScale(ANSEM_SCALE);
+            this.bodySprite.y = ANSEM_Y_OFFSET;
+        }
 
         // Clothes Layer
-        this.clothesSprite = scene.add.sprite(0, 0, `player_clothes_idle_${clothesIndex}`, 0);
+        this.clothesSprite = scene.add.sprite(0, 0, `player_clothes_idle_${this.isAnsem ? 1 : clothesIndex}`, 0);
         this.clothesSprite.setOrigin(0.5, 0.5);
+        if (this.isAnsem) this.clothesSprite.setVisible(false);
 
         // Tool Layer
         this.toolSprite = scene.add.sprite(0, 0, 'player_tools_watering', 0);
@@ -85,27 +94,39 @@ export class OtherPlayer extends Phaser.GameObjects.Container {
         });
     }
 
+    // Ansem has his own idle/walk sheets; his action states (watering, fishing)
+    // don't exist, so the exists() guard simply keeps the current animation.
+    playBodyAnim(state: string) {
+        const key = this.isAnsem ? `ansem_${state}` : `player_base_${state}`;
+        if (this.scene.anims.exists(key)) {
+            this.bodySprite.play(key, true);
+        }
+    }
+
+    // Single place that turns a logical facing into per-sprite flips: human
+    // sheets and tools face right natively, Ansem's sheets face left.
+    setFacing(facingLeft: boolean) {
+        this.bodySprite.setFlipX(this.isAnsem && ANSEM_FACES_LEFT ? !facingLeft : facingLeft);
+        this.clothesSprite.setFlipX(facingLeft);
+        this.toolSprite.setFlipX(facingLeft);
+    }
+
     playAnimations() {
         if (this.isPerformingAction) return;
 
         const animState = this.isMoving ? 'walk' : 'idle';
-        const bodyKey = `player_base_${animState}`;
         const clothesKey = `player_clothes_${this.clothesIndex}_${animState}`;
 
-        if (this.scene.anims.exists(bodyKey)) {
-            this.bodySprite.play(bodyKey, true);
-        }
+        this.playBodyAnim(animState);
         if (this.scene.anims.exists(clothesKey)) {
             this.clothesSprite.play(clothesKey, true);
         }
 
         // Apply flip based on current direction
         if (this.currentDirection === 'left') {
-            this.bodySprite.setFlipX(true);
-            this.clothesSprite.setFlipX(true);
+            this.setFacing(true);
         } else if (this.currentDirection === 'right') {
-            this.bodySprite.setFlipX(false);
-            this.clothesSprite.setFlipX(false);
+            this.setFacing(false);
         }
     }
 
@@ -117,14 +138,9 @@ export class OtherPlayer extends Phaser.GameObjects.Container {
 
         this.toolSprite.setVisible(true);
 
-        const isFlipped = this.currentDirection === 'left';
-        this.bodySprite.setFlipX(isFlipped);
-        this.clothesSprite.setFlipX(isFlipped);
-        this.toolSprite.setFlipX(isFlipped);
+        this.setFacing(this.currentDirection === 'left');
 
-        if (this.scene.anims.exists('player_base_watering')) {
-            this.bodySprite.play('player_base_watering', true);
-        }
+        this.playBodyAnim('watering');
         if (this.scene.anims.exists(`player_clothes_${this.clothesIndex}_watering`)) {
             this.clothesSprite.play(`player_clothes_${this.clothesIndex}_watering`, true);
         }
@@ -144,14 +160,9 @@ export class OtherPlayer extends Phaser.GameObjects.Container {
         this.isMoving = false;
         this.toolSprite.setVisible(true);
 
-        const isFlipped = this.currentDirection === 'left';
-        this.bodySprite.setFlipX(isFlipped);
-        this.clothesSprite.setFlipX(isFlipped);
-        this.toolSprite.setFlipX(isFlipped);
+        this.setFacing(this.currentDirection === 'left');
 
-        if (this.scene.anims.exists('player_base_casting')) {
-            this.bodySprite.play('player_base_casting', true);
-        }
+        this.playBodyAnim('casting');
         if (this.scene.anims.exists(`player_clothes_${this.clothesIndex}_casting`)) {
             this.clothesSprite.play(`player_clothes_${this.clothesIndex}_casting`, true);
         }
@@ -162,9 +173,7 @@ export class OtherPlayer extends Phaser.GameObjects.Container {
         // Wait 1.5s then play waiting anim
         this.scene.time.delayedCall(1500, () => {
             if (!this.isPerformingAction) return;
-            if (this.scene.anims.exists('player_base_waiting')) {
-                this.bodySprite.play('player_base_waiting', true);
-            }
+            this.playBodyAnim('waiting');
             if (this.scene.anims.exists(`player_clothes_${this.clothesIndex}_waiting`)) {
                 this.clothesSprite.play(`player_clothes_${this.clothesIndex}_waiting`, true);
             }
@@ -179,14 +188,9 @@ export class OtherPlayer extends Phaser.GameObjects.Container {
         this.isMoving = false;
         this.toolSprite.setVisible(true);
 
-        const isFlipped = this.currentDirection === 'left';
-        this.bodySprite.setFlipX(isFlipped);
-        this.clothesSprite.setFlipX(isFlipped);
-        this.toolSprite.setFlipX(isFlipped);
+        this.setFacing(this.currentDirection === 'left');
 
-        if (this.scene.anims.exists('player_base_reeling')) {
-            this.bodySprite.play('player_base_reeling', true);
-        }
+        this.playBodyAnim('reeling');
         if (this.scene.anims.exists(`player_clothes_${this.clothesIndex}_reeling`)) {
             this.clothesSprite.play(`player_clothes_${this.clothesIndex}_reeling`, true);
         }
@@ -197,9 +201,7 @@ export class OtherPlayer extends Phaser.GameObjects.Container {
         // 1.3s later play caught anim
         this.scene.time.delayedCall(1300, () => {
             if (!this.isPerformingAction) return;
-            if (this.scene.anims.exists('player_base_caught')) {
-                this.bodySprite.play('player_base_caught', true);
-            }
+            this.playBodyAnim('caught');
             if (this.scene.anims.exists(`player_clothes_${this.clothesIndex}_caught`)) {
                 this.clothesSprite.play(`player_clothes_${this.clothesIndex}_caught`, true);
             }

@@ -1,11 +1,8 @@
 import { NextResponse } from 'next/server';
-import { connectDB } from '../../../../server/db/connect';
-import Message from '../../../../server/db/models/Message';
+import prisma from '../../../../server/db/prisma';
 
 export async function GET(request: Request) {
     try {
-        await connectDB();
-
         const { searchParams } = new URL(request.url);
         const user = searchParams.get('user');
         const friend = searchParams.get('friend');
@@ -15,15 +12,16 @@ export async function GET(request: Request) {
         }
 
         // Fetch the last 50 messages between the user and friend, sorted chronologically
-        const messages = await Message.find({
-            $or: [
-                { sender: user, receiver: friend },
-                { sender: friend, receiver: user }
-            ]
-        })
-        .sort({ timestamp: 1 })
-        .limit(50)
-        .lean();
+        const messages = await prisma.message.findMany({
+            where: {
+                OR: [
+                    { sender: user, receiver: friend },
+                    { sender: friend, receiver: user }
+                ]
+            },
+            orderBy: { timestamp: 'asc' },
+            take: 50
+        });
 
         return NextResponse.json(messages);
     } catch (error) {

@@ -1,47 +1,27 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
+import Image from 'next/image';
 
-const IMAGES = [
-    '/img/bg/img1.png',
-    '/img/bg/img2.png',
-    '/img/bg/img3.png',
-    '/img/bg/img4.png',
-    '/img/bg/img5.png',
-    '/img/bg/img6.png'
-];
-
+// Static game-art backdrop for the landing/title screen (no carousel).
 export default function BackgroundSlider() {
-    const [currentIndex, setCurrentIndex] = useState(0);
-
-    useEffect(() => {
-        const timer = setInterval(() => {
-            setCurrentIndex((prevIndex) => (prevIndex + 1) % IMAGES.length);
-        }, 6000); // Change image every 6 seconds
-
-        return () => clearInterval(timer);
-    }, []);
-
     return (
         <div className="fixed inset-0 z-0 bg-gray-950 overflow-hidden pointer-events-none">
-            {IMAGES.map((src, index) => (
-                <div
-                    key={src}
-                    className={`absolute inset-0 w-full h-full transition-opacity duration-[2500ms] ease-in-out ${
-                        index === currentIndex ? 'opacity-50' : 'opacity-0'
-                    }`}
-                >
-                    <img
-                        src={src}
-                        alt="Background slide"
-                        className={`w-full h-full object-cover transition-transform duration-[12000ms] ease-out ${
-                            index === currentIndex ? 'scale-110' : 'scale-100'
-                        }`}
-                    />
-                </div>
-            ))}
-            {/* Dark/Gradient Overlay for readability */}
-            <div className="absolute inset-0 bg-gradient-to-b from-gray-950/70 via-gray-950/40 to-gray-950/80 z-10" />
+            {/* Pixel art: serve the original file (no re-compression) and upscale with
+                crisp nearest-neighbor rendering so it never looks blurry/broken. */}
+            <Image
+                src="/assets/background_game.png"
+                alt=""
+                fill
+                priority
+                unoptimized
+                sizes="100vw"
+                className="object-cover object-center select-none [image-rendering:pixelated]"
+            />
+            {/* Soft dark overlay for text readability */}
+            <div className="absolute inset-0 bg-gradient-to-b from-gray-950/50 via-gray-950/25 to-gray-950/60 z-10" />
+            {/* Radial vignette to focus attention on the hero content */}
+            <div className="absolute inset-0 z-10 [background:radial-gradient(ellipse_at_center,transparent_40%,rgba(3,7,18,0.45)_100%)]" />
         </div>
     );
 }

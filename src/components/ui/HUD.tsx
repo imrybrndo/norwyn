@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { EventBus } from '../../game/EventBus';
 import { 
     Coins, 
@@ -21,6 +21,7 @@ import {
     HelpCircle
 } from 'lucide-react';
 import PlaytimeRankingModal from './PlaytimeRankingModal';
+import { getCrop, CROP_CATALOG } from '../../../shared/crops';
 
 interface InventoryItem {
     itemType: string;
@@ -83,8 +84,18 @@ const getItemMetadata = (itemType: string) => {
             return { name: 'Uncommon Fish', emoji: '🐠', desc: 'An uncommon fish. Sell at the shop.' };
         case 'fish_rare':
             return { name: 'Rare Fish', emoji: '🐡', desc: 'A rare fish. Sell at the shop.' };
-        default:
+        default: {
+            // Fall back to the shared crop catalog for any newer crop varieties
+            if (itemType.startsWith('seed_')) {
+                const crop = getCrop(itemType.slice('seed_'.length));
+                if (crop) return { name: `${crop.name} Seed`, image: crop.image, emoji: crop.emoji, desc: `Plant to grow ${crop.name}.` };
+            }
+            if (itemType.startsWith('crop_')) {
+                const crop = getCrop(itemType.slice('crop_'.length));
+                if (crop) return { name: `${crop.name} Crop`, image: crop.image, emoji: crop.emoji, desc: `Harvested ${crop.name}. Sell at the shop.` };
+            }
             return { name: itemType.replace('_', ' '), emoji: '📦', desc: 'A pixel item.' };
+        }
     }
 };
 
@@ -141,18 +152,37 @@ export default function HUD() {
     // Online Count
     const [onlineCount, setOnlineCount] = useState(1);
 
-    // Define 9 slots items
-    const hotbarSlots = [
-        { key: 1, type: 'harvest', name: 'Hand', emoji: '✋' },
-        { key: 2, type: 'watering_can', name: 'Water', emoji: '💧' },
-        { key: 3, type: 'seed_rice', name: 'Rice Seed', image: '/padi.png' },
-        { key: 4, type: 'seed_vegetable', name: 'Vegy Seed', emoji: '🥬' },
-        { key: 5, type: 'seed_fruit', name: 'Apple Seed', emoji: '🍎' },
-        { key: 6, type: 'seed_golden_tree', name: 'Golden Seed', emoji: '⭐' },
-        { key: 7, type: 'food_bread', name: 'Bread', emoji: '🍞', isFood: true },
-        { key: 8, type: 'food_rice_bowl', name: 'Rice Bowl', emoji: '🍚', isFood: true },
-        { key: 9, type: 'placeholder', name: 'Empty', emoji: '❌', disabled: true }
-    ];
+    // Build the hotbar dynamically: the two tools are always present, then every
+    // seed / food the player actually owns (including new crop varieties). Items
+    // beyond the 9th have no number-key shortcut but are reachable by scrolling.
+    const hotbarSlots = useMemo(() => {
+        const owned = (itemType: string) => stats.inventory.find(i => i.itemType === itemType)?.count ?? 0;
+
+        const slots: {
+            type: string;
+            name: string;
+            emoji?: string;
+            image?: string;
+            isFood?: boolean;
+            disabled?: boolean;
+        }[] = [
+            { type: 'harvest', name: 'Hand', emoji: '✋' },
+            { type: 'watering_can', name: 'Water', emoji: '💧' },
+        ];
+
+        // Seeds owned, in catalog (tier) order
+        CROP_CATALOG.forEach(crop => {
+            if (owned(`seed_${crop.id}`) > 0) {
+                slots.push({ type: `seed_${crop.id}`, name: `${crop.name} Seed`, image: crop.image, emoji: crop.emoji });
+            }
+        });
+
+        // Foods owned
+        if (owned('food_bread') > 0) slots.push({ type: 'food_bread', name: 'Bread', emoji: '🍞', isFood: true });
+        if (owned('food_rice_bowl') > 0) slots.push({ type: 'food_rice_bowl', name: 'Rice Bowl', emoji: '🍚', isFood: true });
+
+        return slots.map((s, i) => ({ ...s, key: i + 1 }));
+    }, [stats.inventory]);
 
     useEffect(() => {
         // Sync stats changes
@@ -783,8 +813,11 @@ export default function HUD() {
                 </div>
 
                 {/* Bottom-Center: Hotbar */}
-                <div className="col-span-6 flex justify-center">
-                    <div className="bg-gray-900/90 border-4 border-slate-900 p-3 rounded-2xl shadow-2xl pointer-events-auto flex items-center gap-2.5 backdrop-blur-md retro-shadow relative">
+                <div className="col-span-6 flex justify-center min-w-0">
+                    <div
+                        onWheel={(e) => { if (e.deltaY !== 0) e.currentTarget.scrollLeft += e.deltaY; }}
+                        className="bg-gray-900/90 border-4 border-slate-900 p-3 rounded-2xl shadow-2xl pointer-events-auto flex items-center gap-2.5 backdrop-blur-md retro-shadow relative max-w-full overflow-x-auto hotbar-scroll"
+                    >
                         {hotbarSlots.map((slot) => {
                             const count = slot.disabled ? 0 : getInventoryCount(slot.type);
                             const isActive = activeItem === slot.type;
@@ -803,7 +836,7 @@ export default function HUD() {
                                         }
                                     }}
                                     disabled={!hasItem && !slot.disabled}
-                                    className={`relative w-14 h-14 rounded-xl flex flex-col items-center justify-center border-4 transition-all cursor-pointer ${
+                                    className={`relative w-14 h-14 shrink-0 rounded-xl flex flex-col items-center justify-center border-4 transition-all cursor-pointer ${
                                         slot.disabled ? 'border-gray-800 bg-gray-950/30 opacity-30 cursor-not-allowed' :
                                         !hasItem ? 'opacity-40 border-gray-800 bg-gray-950/50 cursor-not-allowed' :
                                         isActive ? 'border-amber-500 bg-amber-500/20 shadow-inner' :
@@ -953,13 +986,18 @@ export default function HUD() {
                                             onMouseEnter={() => item && setHoveredItem(item.itemType)}
                                             onMouseLeave={() => setHoveredItem(null)}
                                             onClick={() => {
-                                                if (item && isFood) {
+                                                if (!item) return;
+                                                if (isFood) {
                                                     handleEatFood(item.itemType);
+                                                } else if (item.itemType.startsWith('seed_')) {
+                                                    // Select this seed for planting and close the bag
+                                                    selectItem(item.itemType);
+                                                    setActiveModal(null);
                                                 }
                                             }}
                                             className={`w-[60px] h-[60px] bg-slate-950 border-4 rounded-xl flex items-center justify-center relative cursor-pointer ${
                                                 item ? 'border-slate-800 hover:border-amber-500' : 'border-slate-800/40 cursor-default'
-                                            }`}
+                                            } ${item && item.itemType === activeItem ? 'border-amber-500 ring-2 ring-amber-500/40' : ''}`}
                                         >
                                             {item && meta && (
                                                 <>
@@ -975,6 +1013,12 @@ export default function HUD() {
                                                     {isFood && (
                                                         <span className="absolute top-0.5 right-0.5 text-[5px] text-amber-500 font-extrabold uppercase leading-none">
                                                             EAT
+                                                        </span>
+                                                    )}
+
+                                                    {item.itemType.startsWith('seed_') && (
+                                                        <span className="absolute top-0.5 right-0.5 text-[5px] text-emerald-400 font-extrabold uppercase leading-none">
+                                                            PLANT
                                                         </span>
                                                     )}
                                                 </>

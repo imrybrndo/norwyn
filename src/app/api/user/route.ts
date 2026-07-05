@@ -1,10 +1,14 @@
 import { NextResponse } from 'next/server';
-import { connectDB } from '../../../../server/db/connect';
-import User from '../../../../server/db/models/User';
+import prisma from '../../../../server/db/prisma';
+
+// lastDailyChestClaim is a BigInt column; JSON can't serialize BigInt, so
+// convert it to a number before returning the user.
+function serializeUser<T extends { lastDailyChestClaim: bigint }>(user: T) {
+    return { ...user, lastDailyChestClaim: Number(user.lastDailyChestClaim) };
+}
 
 export async function GET(request: Request) {
     try {
-        await connectDB();
         const { searchParams } = new URL(request.url);
         const walletAddress = searchParams.get('walletAddress');
 
@@ -12,12 +16,12 @@ export async function GET(request: Request) {
             return NextResponse.json({ error: 'Missing walletAddress parameter' }, { status: 400 });
         }
 
-        const user = await User.findOne({ walletAddress });
+        const user = await prisma.user.findUnique({ where: { walletAddress } });
         if (!user) {
             return NextResponse.json({ error: 'User not found' }, { status: 404 });
         }
 
-        return NextResponse.json(user, { status: 200 });
+        return NextResponse.json(serializeUser(user), { status: 200 });
     } catch (error: any) {
         console.error('Error fetching user:', error);
         return NextResponse.json({ error: error.message }, { status: 500 });
@@ -26,7 +30,6 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
     try {
-        await connectDB();
         const body = await request.json();
         const { walletAddress, username, role, clothesIndex, gender, avatarStyle } = body;
 
@@ -35,24 +38,23 @@ export async function POST(request: Request) {
         }
 
         // Check if user already exists
-        const existingUser = await User.findOne({ walletAddress });
+        const existingUser = await prisma.user.findUnique({ where: { walletAddress } });
         if (existingUser) {
             return NextResponse.json({ error: 'User already exists' }, { status: 409 });
         }
 
-        // Create new user with role, clothesIndex, gender, and avatarStyle
-        const newUser = new User({
-            walletAddress,
-            username,
-            role: role || 'Farmer',
-            clothesIndex: clothesIndex || avatarStyle || 1,
-            avatarStyle: avatarStyle || clothesIndex || 1,
-            avatar_style: avatarStyle || clothesIndex || 1,
-            gender: gender || 'Male',
+        // Create new user with role, gender, and avatarStyle
+        const newUser = await prisma.user.create({
+            data: {
+                walletAddress,
+                username,
+                role: (role || 'Farmer') as 'Farmer' | 'Woodcutter' | 'Fisher',
+                avatarStyle: avatarStyle || clothesIndex || 1,
+                gender: (gender || 'Male') as 'Male' | 'Female',
+            }
         });
 
-        await newUser.save();
-        return NextResponse.json(newUser, { status: 201 });
+        return NextResponse.json(serializeUser(newUser), { status: 201 });
     } catch (error: any) {
         console.error('Error creating user:', error);
         return NextResponse.json({ error: error.message }, { status: 500 });

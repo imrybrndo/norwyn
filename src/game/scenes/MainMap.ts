@@ -7,6 +7,7 @@ import { colyseusClient } from '../../network/colyseus';
 import { EventBus } from '../EventBus';
 import { Room, Callbacks } from '@colyseus/sdk';
 import { GameState } from '../../../server/rooms/schema/GameState';
+import { getCrop, getCropBySeed } from '../../../shared/crops';
 
 export class MainMap extends Phaser.Scene {
     player!: Player;
@@ -383,6 +384,25 @@ export class MainMap extends Phaser.Scene {
             this.emitLocalStats();
         }
 
+        else if (type === 'buySeedSpecific') {
+            const crop = getCrop(payload?.cropType);
+            if (!crop) {
+                EventBus.emit('network-error', 'Invalid seed type!');
+                return;
+            }
+            const rawCount = Number(payload?.count ?? 1);
+            const count = Number.isFinite(rawCount) ? Math.max(1, Math.floor(rawCount)) : 1;
+            const totalCost = crop.buyPrice * count;
+            if (this.localStats.gold < totalCost) {
+                EventBus.emit('network-error', 'Not enough gold!');
+                return;
+            }
+            this.localStats.gold -= totalCost;
+            this.addLocalInventory(`seed_${crop.id}`, count);
+            EventBus.emit('network-toast', { type: 'success', message: `Bought ${count}x ${crop.name} seed!` });
+            this.emitLocalStats();
+        }
+
         else if (type === 'buyFood') {
             let price = 0;
             if (payload.foodType === 'food_bread') price = 10;
@@ -434,6 +454,10 @@ export class MainMap extends Phaser.Scene {
         }
 
         else if (type === 'sleep') {
+            if (this.localStats.isSleeping) {
+                EventBus.emit('network-error', 'You are already sleeping!');
+                return;
+            }
             if (this.localStats.gold < 40) {
                 EventBus.emit('network-error', 'Need 40 Gold to sleep!');
                 return;
@@ -458,13 +482,21 @@ export class MainMap extends Phaser.Scene {
             else if (payload.option === 'dur_50') { cost = 25; repairAmount = 50; }
             else if (payload.option === 'dur_full') { cost = 40; repairAmount = 100; }
 
+            const target = payload.toolType || 'watering_can';
+            const currentDurability = target === 'fishing_rod'
+                ? (this.localStats.fishingRodDurability ?? 100)
+                : this.localStats.wateringCanDurability;
+            if (currentDurability >= 100) {
+                EventBus.emit('network-error', 'Tool durability is already full!');
+                return;
+            }
+
             if (this.localStats.gold < cost) {
                 EventBus.emit('network-error', 'Not enough gold!');
                 return;
             }
 
             this.localStats.gold -= cost;
-            const target = payload.toolType || 'watering_can';
             if (target === 'fishing_rod') {
                 this.localStats.fishingRodDurability = Math.min(100, (this.localStats.fishingRodDurability || 0) + repairAmount);
                 EventBus.emit('network-toast', { type: 'success', message: 'Fishing Rod repaired!' });
@@ -521,16 +553,20 @@ export class MainMap extends Phaser.Scene {
         else if (type === 'sellCrop') {
             const itemType = payload.cropType.startsWith('fish_') ? payload.cropType : `crop_${payload.cropType}`;
             let sellPrice = 0;
-            if (payload.cropType === 'rice') sellPrice = 2;
-            else if (payload.cropType === 'vegetable') sellPrice = 50;
-            else if (payload.cropType === 'fruit') sellPrice = 100;
-            else if (payload.cropType === 'golden_tree') sellPrice = 200;
+            const cropDef = getCrop(payload.cropType);
+            if (cropDef) sellPrice = cropDef.sellPrice;
             else if (payload.cropType === 'fish_common') sellPrice = 25;
             else if (payload.cropType === 'fish_uncommon') sellPrice = 60;
             else if (payload.cropType === 'fish_rare') sellPrice = 150;
 
-            const totalEarnings = sellPrice * payload.count;
-            if (this.deductLocalInventory(itemType, payload.count)) {
+            const count = Math.floor(Number(payload.count));
+            if (!Number.isFinite(count) || count < 1) {
+                EventBus.emit('network-error', 'Invalid sell amount!');
+                return;
+            }
+
+            const totalEarnings = sellPrice * count;
+            if (this.deductLocalInventory(itemType, count)) {
                 this.localStats.gold += totalEarnings;
                 EventBus.emit('network-toast', { type: 'success', message: `Sold items for ${totalEarnings} Gold!` });
                 this.emitLocalStats();
@@ -581,19 +617,12 @@ export class MainMap extends Phaser.Scene {
             }
         } else if (this.activeItem.startsWith('seed_')) {
             if (!crop && this.isFarmablePlot(worldPoint.x, worldPoint.y)) {
-                let energyCost = 2;
-                let growthTime = 10000; // rice 10s
-                let cropType = 'rice';
+                const cropDef = getCropBySeed(this.activeItem);
+                if (!cropDef) return;
 
-                if (this.activeItem === 'seed_rice') {
-                    energyCost = 2; growthTime = 10000; cropType = 'rice';
-                } else if (this.activeItem === 'seed_vegetable') {
-                    energyCost = 8; growthTime = 60000; cropType = 'vegetable';
-                } else if (this.activeItem === 'seed_fruit') {
-                    energyCost = 15; growthTime = 90000; cropType = 'fruit';
-                } else if (this.activeItem === 'seed_golden_tree') {
-                    energyCost = 20; growthTime = 120000; cropType = 'golden_tree';
-                }
+                let energyCost = cropDef.energyCost;
+                let growthTime = cropDef.growthTime;
+                const cropType = cropDef.id;
 
                 if (this.localStats.wateringCanLevel >= 4) {
                     energyCost = Math.round(energyCost * 0.8);
@@ -1072,6 +1101,8 @@ export class MainMap extends Phaser.Scene {
                             isSleeping: player.isSleeping,
                             wateringCanLevel: player.wateringCanLevel,
                             wateringCanDurability: player.wateringCanDurability,
+                            fishingRodLevel: player.fishingRodLevel,
+                            fishingRodDurability: player.fishingRodDurability,
                             inventory: player.inventory.map((item: any) => ({
                                 itemType: item.itemType,
                                 count: item.count

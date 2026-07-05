@@ -2,12 +2,68 @@
 
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Sprout, Axe, Fish, ArrowLeft, ArrowRight, ShieldCheck, Sparkles, User, UserCheck } from 'lucide-react';
+import { Sprout, ArrowLeft, ArrowRight, ShieldCheck, User, UserCheck } from 'lucide-react';
 
 interface OnboardingFlowProps {
     onBack: () => void;
     onSubmit: (data: { username: string; role: string; clothesIndex: number; gender: string; avatarStyle: number }) => void;
     isSubmitting: boolean;
+}
+
+// Animated in-game character preview: the same two sprite layers Phaser renders
+// (base body + clothes overlay), cropped to the figure and played with a CSS
+// steps() animation over the 9 idle frames.
+const SPRITE_SHEET_W = 864; // 9 frames x 96px
+const SPRITE_SHEET_H = 64;
+const SPRITE_CROP = { x: 36, y: 14, w: 24, h: 28 }; // window around the figure in frame 0
+const SPRITE_SCALE = 4;
+const ANSEM_STYLE_ID = 4; // standalone character rendered from its own GIF/spritesheet
+
+function CharacterSprite({ styleId, scale = SPRITE_SCALE }: { styleId: number; scale?: number }) {
+    const w = SPRITE_CROP.w * scale;
+    const h = SPRITE_CROP.h * scale;
+
+    if (styleId === ANSEM_STYLE_ID) {
+        // Ansem's idle.gif animates natively in the browser; scale the 64x64
+        // frame to the preview height and center it in the same crop box.
+        return (
+            <div
+                style={{
+                    width: w,
+                    height: h,
+                    backgroundImage: 'url(/assets/Characters/Ansem/idle.gif)',
+                    backgroundRepeat: 'no-repeat',
+                    backgroundSize: `${h}px ${h}px`,
+                    backgroundPosition: `${(w - h) / 2}px 0`,
+                    imageRendering: 'pixelated',
+                }}
+            />
+        );
+    }
+    const layer = (url: string): React.CSSProperties => ({
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        width: w,
+        height: h,
+        backgroundImage: `url(${url})`,
+        backgroundRepeat: 'no-repeat',
+        backgroundSize: `${SPRITE_SHEET_W * scale}px ${SPRITE_SHEET_H * scale}px`,
+        backgroundPositionX: `-${SPRITE_CROP.x * scale}px`,
+        backgroundPositionY: `-${SPRITE_CROP.y * scale}px`,
+        imageRendering: 'pixelated',
+        animation: `onboarding-idle-${scale} 1.5s steps(9) infinite`,
+    });
+    return (
+        <div style={{ position: 'relative', width: w, height: h }}>
+            <div style={layer('/assets/sprites/characters/base_idle.png')} />
+            <div style={layer(`/assets/sprites/characters/clothes_idle_${styleId}.png`)} />
+            <style>{`@keyframes onboarding-idle-${scale} {
+                from { background-position-x: -${SPRITE_CROP.x * scale}px; }
+                to { background-position-x: -${(SPRITE_SHEET_W + SPRITE_CROP.x) * scale}px; }
+            }`}</style>
+        </div>
+    );
 }
 
 export default function OnboardingFlow({ onBack, onSubmit, isSubmitting }: OnboardingFlowProps) {
@@ -48,12 +104,11 @@ export default function OnboardingFlow({ onBack, onSubmit, isSubmitting }: Onboa
     };
 
     const styleDetails = [
-        { id: 1, name: 'Ruby Red Outfit', color: 'bg-red-500 border-red-500/55' },
-        { id: 2, name: 'Emerald Green Outfit', color: 'bg-emerald-500 border-emerald-500/55' },
-        { id: 3, name: 'Sapphire Blue Outfit', color: 'bg-blue-500 border-blue-500/55' },
+        { id: 1, name: 'Bowl Hair' },
+        { id: 2, name: 'Curly Hair' },
+        { id: 3, name: 'Long Hair' },
+        { id: ANSEM_STYLE_ID, name: 'Ansem' },
     ];
-
-    const ActiveRoleIcon = roleDetails[role].icon;
 
     return (
         <div className="relative flex flex-col items-center justify-center min-h-screen text-center px-4 overflow-hidden select-none w-full">
@@ -157,7 +212,7 @@ export default function OnboardingFlow({ onBack, onSubmit, isSubmitting }: Onboa
                         {/* Outfit / Sprite selection */}
                         <div className="flex flex-col gap-2">
                             <label className="text-xs text-amber-400 uppercase font-semibold">Starting Clothes Style</label>
-                            <div className="grid grid-cols-3 gap-3">
+                            <div className="grid grid-cols-2 gap-3">
                                 {styleDetails.map((style) => (
                                     <button
                                         key={style.id}
@@ -169,7 +224,13 @@ export default function OnboardingFlow({ onBack, onSubmit, isSubmitting }: Onboa
                                                 : 'bg-gray-950 border-gray-800 hover:border-amber-500/40 text-gray-400'
                                         }`}
                                     >
-                                        <span className={`w-3.5 h-3.5 rounded-full ${style.color}`} />
+                                        <span
+                                            className={`rounded-lg p-1 transition-all ${
+                                                avatarStyle === style.id ? 'bg-amber-500/10 ring-1 ring-amber-500/40' : 'bg-gray-900'
+                                            }`}
+                                        >
+                                            <CharacterSprite styleId={style.id} />
+                                        </span>
                                         {style.name}
                                     </button>
                                 ))}
@@ -228,12 +289,12 @@ export default function OnboardingFlow({ onBack, onSubmit, isSubmitting }: Onboa
 
                         {/* Confirmation summary box */}
                         <div className="mt-1 p-3 bg-gray-950 border border-gray-800 rounded-xl flex items-center gap-3">
-                            <div className="p-2 bg-amber-500/10 rounded-lg">
-                                <ActiveRoleIcon className="w-6 h-6 text-amber-500" />
+                            <div className="p-1 bg-amber-500/10 rounded-lg">
+                                <CharacterSprite styleId={avatarStyle} scale={2} />
                             </div>
                             <div className="flex flex-col gap-0.5 text-[10px] text-gray-400">
                                 <span className="font-bold text-white text-xs uppercase">{username}</span>
-                                <span>Gender: {gender} | Style: Outfit {avatarStyle}</span>
+                                <span>Gender: {gender} | Style: {styleDetails.find(s => s.id === avatarStyle)?.name ?? `Outfit ${avatarStyle}`}</span>
                                 <span>Profession: <strong className="text-amber-400">{role}</strong></span>
                             </div>
                         </div>

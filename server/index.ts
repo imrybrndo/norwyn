@@ -1,10 +1,8 @@
+import './env';
 import express from 'express';
 import http from 'http';
 import next from 'next';
 import cors from 'cors';
-import { loadEnvConfig } from '@next/env';
-
-loadEnvConfig(process.cwd());
 
 // Prevent WebSocket frame errors or HMR disconnects from crashing the server
 process.on('uncaughtException', (err) => {
@@ -15,9 +13,8 @@ process.on('unhandledRejection', (reason, promise) => {
 });
 import { Server, matchMaker } from '@colyseus/core';
 import { WebSocketTransport } from '@colyseus/ws-transport';
-import { connectDB } from './db/connect';
 import { GameRoom } from './rooms/GameRoom';
-import User from './db/models/User';
+import prisma from './db/prisma';
 
 const dev = process.env.NODE_ENV !== 'production';
 const port = parseInt(process.env.PORT || '3000', 10);
@@ -25,8 +22,7 @@ const nextApp = next({ dev });
 const handle = nextApp.getRequestHandler();
 
 nextApp.prepare().then(async () => {
-    // Connect to database
-    await connectDB();
+    // Prisma connects lazily via its driver adapter; no explicit connect needed.
 
     const app = express();
     app.use(cors());
@@ -67,7 +63,7 @@ nextApp.prepare().then(async () => {
         try {
             const rooms = await matchMaker.query({});
             const count = rooms.reduce((acc, room) => acc + (room.clients || 0), 0);
-            const total = await User.countDocuments({});
+            const total = await prisma.user.count();
             // Add +2 to count representing the 2 permanently online guest NPCs (Guest_Ed and Guest_Rey)
             res.json({ online: count + 2, total });
         } catch (e) {

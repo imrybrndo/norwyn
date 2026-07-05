@@ -1,19 +1,24 @@
 import { NextResponse } from 'next/server';
-import { connectDB } from '../../../../server/db/connect';
-import User from '../../../../server/db/models/User';
+import prisma from '../../../../server/db/prisma';
 
 export const revalidate = 60; // Cache for 60 seconds
 
 export async function GET() {
     try {
-        await connectDB();
-
         // Fetch top 100 players, sorted by level (descending), then gold (descending)
-        const topUsers = await User.find({})
-            .select('walletAddress username level gold totalPlaytime role createdAt')
-            .sort({ level: -1, gold: -1 })
-            .limit(100)
-            .lean();
+        const topUsers = await prisma.user.findMany({
+            select: {
+                walletAddress: true,
+                username: true,
+                level: true,
+                gold: true,
+                totalPlaytime: true,
+                role: true,
+                createdAt: true
+            },
+            orderBy: [{ level: 'desc' }, { gold: 'desc' }],
+            take: 100
+        });
 
         return NextResponse.json(topUsers);
     } catch (error) {

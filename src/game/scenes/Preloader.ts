@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { CROP_CATALOG } from '../../../shared/crops';
 
 export class Preloader extends Phaser.Scene {
     constructor() {
@@ -78,6 +79,17 @@ export class Preloader extends Phaser.Scene {
             });
         }
 
+        // Ansem character (standalone body, no clothes overlay) — strips
+        // pre-rendered from the source GIFs in the same folder
+        this.load.spritesheet('ansem_idle', '/assets/Characters/Ansem/idle_strip8.png', {
+            frameWidth: 64,
+            frameHeight: 64
+        });
+        this.load.spritesheet('ansem_walk', '/assets/Characters/Ansem/walk_strip8.png', {
+            frameWidth: 64,
+            frameHeight: 64
+        });
+
         // Load watering animations
         this.load.spritesheet('player_base_watering', '/assets/Characters/Human/WATERING/base_watering_strip5.png', {
             frameWidth: 96,
@@ -155,18 +167,12 @@ export class Preloader extends Phaser.Scene {
         this.load.image('expression_alerted', '/assets/UI/expression_alerted.png');
 
 
-        // Load crop sprites (wheat for rice, cabbage for vegetable, pumpkin for fruit, sunflower for golden_tree)
-        const cropMap = {
-            rice: 'wheat',
-            vegetable: 'cabbage',
-            fruit: 'pumpkin',
-            golden_tree: 'sunflower'
-        };
-
-        Object.entries(cropMap).forEach(([key, value]) => {
+        // Load crop sprites for every crop in the shared catalog
+        // (crop_<id>_stage_0..5 from its sprite set, e.g. carrot -> carrot_00..05)
+        CROP_CATALOG.forEach(({ id, sprite }) => {
             for (let i = 0; i <= 5; i++) {
                 const pad = String(i).padStart(2, '0');
-                this.load.image(`crop_${key}_stage_${i}`, `/assets/Elements/Crops/${value}_${pad}.png`);
+                this.load.image(`crop_${id}_stage_${i}`, `/assets/Elements/Crops/${sprite}_${pad}.png`);
             }
         });
 

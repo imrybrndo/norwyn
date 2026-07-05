@@ -1,7 +1,38 @@
 import { Room, Client } from '@colyseus/core';
 import { GameState, PlayerState, InventoryItemState, CropState } from './schema/GameState';
-import User from '../db/models/User';
-import Message from '../db/models/Message';
+import prisma from '../db/prisma';
+import { CROP_CATALOG, getCrop, getCropBySeed } from '../../shared/crops';
+import fs from 'fs';
+import path from 'path';
+
+// Farm plot rectangles parsed from the same Tiled map the client renders, so
+// client and server always agree on where planting is allowed. If the map file
+// can't be read the list stays empty and validation fails open (with a log).
+const FARM_PLOTS: Array<{ x: number; y: number; width: number; height: number }> = (() => {
+    try {
+        const mapPath = path.join(process.cwd(), 'public', 'assets', 'maps', 'farm-v2.tmj');
+        const rawMap = JSON.parse(fs.readFileSync(mapPath, 'utf-8'));
+        const layer = (rawMap.layers ?? []).find((l: any) => l.type === 'objectgroup' && l.name === 'Interactables');
+        const plots = (layer?.objects ?? [])
+            .filter((o: any) => o.type === 'farm_plot' || (o.name && o.name.startsWith('lahan_')))
+            .map((o: any) => ({ x: o.x, y: o.y, width: o.width, height: o.height }));
+        console.log(`[GameRoom] Loaded ${plots.length} farm plots from map file.`);
+        return plots;
+    } catch (e) {
+        console.error('[GameRoom] Failed to load farm plots from map file — plant location validation disabled:', e);
+        return [];
+    }
+})();
+
+// Same check as MainMap.isFarmablePlot, applied to the center of the tile.
+function isFarmableTile(tileX: number, tileY: number): boolean {
+    const x = tileX * 16 + 8;
+    const y = tileY * 16 + 8;
+    return FARM_PLOTS.some(plot =>
+        x >= plot.x && x <= plot.x + plot.width &&
+        y >= plot.y && y <= plot.y + plot.height
+    );
+}
 
 // Helper to sync DB player stats to Colyseus schema state
 function syncPlayerState(player: PlayerState, user: any) {
@@ -9,21 +40,21 @@ function syncPlayerState(player: PlayerState, user: any) {
     player.role = user.role ?? "Farmer";
     player.gender = user.gender ?? "Male";
     player.avatarStyle = user.avatarStyle ?? 1;
-    player.clothesIndex = user.clothesIndex ?? user.avatarStyle ?? 1;
+    player.clothesIndex = user.avatarStyle ?? 1;
     player.gold = user.gold ?? 100;
     player.energy = user.energy ?? 100;
     player.hunger = user.hunger ?? 100;
     player.level = user.level ?? 1;
     player.exp = user.exp ?? 0;
-    player.wateringCanLevel = user.wateringCan?.level ?? 1;
-    player.wateringCanDurability = user.wateringCan?.durability ?? 100;
-    player.axeLevel = user.axe?.level ?? 1;
-    player.axeDurability = user.axe?.durability ?? 100;
-    player.fishingRodLevel = user.fishingRod?.level ?? 1;
-    player.fishingRodDurability = user.fishingRod?.durability ?? 100;
+    player.wateringCanLevel = user.wateringCanLevel ?? 1;
+    player.wateringCanDurability = user.wateringCanDurability ?? 100;
+    player.axeLevel = user.axeLevel ?? 1;
+    player.axeDurability = user.axeDurability ?? 100;
+    player.fishingRodLevel = user.fishingRodLevel ?? 1;
+    player.fishingRodDurability = user.fishingRodDurability ?? 100;
 
     player.inventory.clear();
-    if (user.inventory) {
+    if (Array.isArray(user.inventory)) {
         user.inventory.forEach((item: any) => {
             const itemState = new InventoryItemState();
             itemState.itemType = item.itemType;
@@ -34,12 +65,13 @@ function syncPlayerState(player: PlayerState, user: any) {
 
     player.lastClaimedQuests.clear();
     if (user.lastClaimedQuests) {
-        user.lastClaimedQuests.forEach((value: number, key: string) => {
-            player.lastClaimedQuests.set(key, value);
+        // Stored as a JSON object ({ questId: epochMs }) in Postgres.
+        Object.entries(user.lastClaimedQuests).forEach(([key, value]) => {
+            player.lastClaimedQuests.set(key, Number(value));
         });
     }
 
-    player.lastDailyChestClaim = user.lastDailyChestClaim ?? 0;
+    player.lastDailyChestClaim = Number(user.lastDailyChestClaim ?? 0);
 
     player.friends.clear();
     if (user.friends) {
@@ -60,45 +92,67 @@ function syncPlayerState(player: PlayerState, user: any) {
 async function savePlayerToDb(player: PlayerState) {
     if (player.isGuest) return;
     try {
-        const query = player.walletAddress 
-            ? { walletAddress: player.walletAddress } 
+        const where = player.walletAddress
+            ? { walletAddress: player.walletAddress }
             : { username: player.username };
 
-        await User.updateOne(query, {
-            gold: player.gold,
-            offChainCoins: player.gold,
-            off_chain_coins: player.gold,
-            energy: player.energy,
-            currentEnergy: player.energy,
-            current_energy: player.energy,
-            hunger: player.hunger,
-            level: player.level,
-            exp: player.exp,
-            gender: player.gender,
-            avatarStyle: player.avatarStyle,
-            avatar_style: player.avatarStyle,
-            clothesIndex: player.avatarStyle,
-            wateringCan: {
-                level: player.wateringCanLevel,
-                durability: player.wateringCanDurability
-            },
-            axe: {
-                level: player.axeLevel,
-                durability: player.axeDurability
-            },
-            fishingRod: {
-                level: player.fishingRodLevel,
-                durability: player.fishingRodDurability
-            },
-            inventory: player.inventory.map(item => ({
-                itemType: item.itemType,
-                count: item.count
-            })),
-            lastClaimedQuests: Object.fromEntries(player.lastClaimedQuests),
-            lastDailyChestClaim: player.lastDailyChestClaim
+        await prisma.user.update({
+            where,
+            data: {
+                gold: player.gold,
+                energy: player.energy,
+                hunger: player.hunger,
+                level: player.level,
+                exp: player.exp,
+                gender: player.gender as 'Male' | 'Female',
+                avatarStyle: player.avatarStyle,
+                wateringCanLevel: player.wateringCanLevel,
+                wateringCanDurability: player.wateringCanDurability,
+                axeLevel: player.axeLevel,
+                axeDurability: player.axeDurability,
+                fishingRodLevel: player.fishingRodLevel,
+                fishingRodDurability: player.fishingRodDurability,
+                inventory: player.inventory.map(item => ({
+                    itemType: item.itemType,
+                    count: item.count
+                })),
+                lastClaimedQuests: Object.fromEntries(player.lastClaimedQuests),
+                lastDailyChestClaim: BigInt(player.lastDailyChestClaim)
+            }
         });
     } catch (e) {
         console.error(`Error saving user ${player.username} to DB:`, e);
+    }
+}
+
+// Write-through crop persistence: crops are written on plant/water and removed
+// on harvest/decay so growing plants survive server restarts.
+async function saveCropToDb(crop: CropState) {
+    try {
+        await prisma.crop.upsert({
+            where: { id: crop.id },
+            create: {
+                id: crop.id,
+                tileX: crop.tileX,
+                tileY: crop.tileY,
+                cropType: crop.cropType,
+                plantedAt: BigInt(crop.plantedAt),
+                readyAt: BigInt(crop.readyAt),
+                watered: crop.watered,
+                ownerId: crop.ownerId
+            },
+            update: { watered: crop.watered }
+        });
+    } catch (e) {
+        console.error(`Error saving crop ${crop.id} to DB:`, e);
+    }
+}
+
+async function deleteCropFromDb(cropId: string) {
+    try {
+        await prisma.crop.deleteMany({ where: { id: cropId } });
+    } catch (e) {
+        console.error(`Error deleting crop ${cropId} from DB:`, e);
     }
 }
 
@@ -127,15 +181,16 @@ function deductFromInventory(player: PlayerState, itemType: string, count: numbe
 function gainExp(client: Client, player: PlayerState, amount: number) {
     player.exp += amount;
     let requiredExp = player.level * 100;
-    if (player.exp >= requiredExp) {
+    while (player.exp >= requiredExp) {
         if (player.isGuest) {
             player.exp = requiredExp - 1; // Cap EXP at Level 1 max
             client.send('toast', { type: 'warning', message: 'Guest accounts cannot progress past Level 1. Connect a wallet to level up!' });
-        } else {
-            player.level += 1;
-            player.exp -= requiredExp;
-            client.send('toast', { type: 'success', message: `Level Up! You are now Level ${player.level}!` });
+            break;
         }
+        player.level += 1;
+        player.exp -= requiredExp;
+        client.send('toast', { type: 'success', message: `Level Up! You are now Level ${player.level}!` });
+        requiredExp = player.level * 100;
     }
 }
 
@@ -144,8 +199,39 @@ export class GameRoom extends Room<{ state: GameState }> {
     private fishingStartTimes = new Map<string, number>();
     private preRolledFishing = new Map<string, { fishType: string, fishName: string, expGained: number, waitTime: number }>();
 
-    onCreate(options: any) {
+    async onCreate(options: any) {
         this.setState(new GameState());
+
+        // Restore persisted crops so growing plants survive server restarts.
+        // Timestamps are absolute epoch ms, so growth continued while offline;
+        // anything past its decay window is purged instead of restored.
+        try {
+            const savedCrops = await prisma.crop.findMany();
+            const now = Date.now();
+            const expiredIds: string[] = [];
+            for (const saved of savedCrops) {
+                if (now >= Number(saved.readyAt) + 120000) {
+                    expiredIds.push(saved.id);
+                    continue;
+                }
+                const crop = new CropState();
+                crop.id = saved.id;
+                crop.tileX = saved.tileX;
+                crop.tileY = saved.tileY;
+                crop.cropType = saved.cropType;
+                crop.plantedAt = Number(saved.plantedAt);
+                crop.readyAt = Number(saved.readyAt);
+                crop.watered = saved.watered;
+                crop.ownerId = saved.ownerId;
+                this.state.crops.set(crop.id, crop);
+            }
+            if (expiredIds.length > 0) {
+                await prisma.crop.deleteMany({ where: { id: { in: expiredIds } } });
+            }
+            console.log(`[GameRoom] Restored ${this.state.crops.size} crops from DB (purged ${expiredIds.length} expired).`);
+        } catch (e) {
+            console.error('[GameRoom] Failed to restore crops from DB:', e);
+        }
 
         // Initialize the 2 NPCs (Ed and Rey) in the room state so they are always counted as online players
         const edState = new PlayerState();
@@ -188,8 +274,10 @@ export class GameRoom extends Room<{ state: GameState }> {
                     changed = true;
                 }
 
-                // Save to database if changed
-                if (changed) {
+                // Flush passive regen to the DB every 6th tick (~60s) instead of
+                // every tick — all gold/item transactions save immediately anyway,
+                // so a crash loses at most a minute of passive energy/hunger drift.
+                if (changed && tickCount % 6 === 0) {
                     await savePlayerToDb(player);
                 }
             });
@@ -199,6 +287,7 @@ export class GameRoom extends Room<{ state: GameState }> {
             this.state.crops.forEach((crop, tileKey) => {
                 if (now >= crop.readyAt + 120000) {
                     this.state.crops.delete(tileKey);
+                    deleteCropFromDb(tileKey);
                 }
             });
         }, 10000);
@@ -251,10 +340,46 @@ export class GameRoom extends Room<{ state: GameState }> {
             client.send('toast', { type: 'success', message: `Got ${seedType.replace('seed_', '')} seed!` });
         });
 
+        // Buy a specific seed directly (no gacha) - cost from crop catalog
+        this.onMessage('buySeedSpecific', async (client: Client, data: { cropType: string, count?: number }) => {
+            const player = this.state.players.get(client.sessionId);
+            if (!player) return;
+
+            const crop = getCrop(data.cropType);
+            if (!crop) {
+                client.send('error', 'Invalid seed type!');
+                return;
+            }
+
+            const rawCount = Number(data.count ?? 1);
+            const count = Number.isFinite(rawCount) ? Math.max(1, Math.floor(rawCount)) : 1;
+            const totalCost = crop.buyPrice * count;
+
+            if (player.gold < totalCost) {
+                client.send('error', 'Not enough gold!');
+                return;
+            }
+
+            player.gold -= totalCost;
+            addToInventory(player, `seed_${crop.id}`, count);
+            await savePlayerToDb(player);
+            client.send('toast', { type: 'success', message: `Bought ${count}x ${crop.name} seed!` });
+        });
+
         // Plant Seed - requires seed, tile coordinates, and deducts Energy + Durability
         this.onMessage('plantSeed', async (client: Client, data: { tileX: number, tileY: number, seedType: string }) => {
             const player = this.state.players.get(client.sessionId);
             if (!player) return;
+
+            if (!Number.isInteger(data.tileX) || !Number.isInteger(data.tileY)) {
+                client.send('error', 'Invalid tile!');
+                return;
+            }
+
+            if (FARM_PLOTS.length > 0 && !isFarmableTile(data.tileX, data.tileY)) {
+                client.send('error', 'You can only plant on farm land!');
+                return;
+            }
 
             const tileKey = `${data.tileX}_${data.tileY}`;
             if (this.state.crops.has(tileKey)) {
@@ -262,31 +387,16 @@ export class GameRoom extends Room<{ state: GameState }> {
                 return;
             }
 
-            // Energy & Durability cost depending on crop
-            let energyCost = 2;
-            let growthTime = 10000; // default rice 10s
-            let cropType = 'rice';
-
-            if (data.seedType === 'seed_rice') {
-                energyCost = 2;
-                growthTime = 10000;
-                cropType = 'rice';
-            } else if (data.seedType === 'seed_vegetable') {
-                energyCost = 8;
-                growthTime = 60000; // 60s
-                cropType = 'vegetable';
-            } else if (data.seedType === 'seed_fruit') {
-                energyCost = 15;
-                growthTime = 90000; // 90s
-                cropType = 'fruit';
-            } else if (data.seedType === 'seed_golden_tree') {
-                energyCost = 20;
-                growthTime = 120000; // 120s
-                cropType = 'golden_tree';
-            } else {
+            // Energy & Durability cost depending on crop (from shared catalog)
+            const cropDef = getCropBySeed(data.seedType);
+            if (!cropDef) {
                 client.send('error', 'Invalid seed type!');
                 return;
             }
+
+            let energyCost = cropDef.energyCost;
+            let growthTime = cropDef.growthTime;
+            const cropType = cropDef.id;
 
             // Apply Level 4 Energy Cost discount (20% reduction)
             if (player.wateringCanLevel >= 4) {
@@ -330,6 +440,7 @@ export class GameRoom extends Room<{ state: GameState }> {
             crop.ownerId = player.username;
 
             this.state.crops.set(tileKey, crop);
+            await saveCropToDb(crop);
             await savePlayerToDb(player);
         });
 
@@ -371,6 +482,7 @@ export class GameRoom extends Room<{ state: GameState }> {
 
             this.broadcast('player-watered', { sessionId: client.sessionId });
 
+            await saveCropToDb(crop);
             await savePlayerToDb(player);
         });
 
@@ -403,15 +515,12 @@ export class GameRoom extends Room<{ state: GameState }> {
 
             // Remove crop and add to inventory
             this.state.crops.delete(tileKey);
+            await deleteCropFromDb(tileKey);
             addToInventory(player, `crop_${crop.cropType}`, 1);
             
-            // Add EXP based on crop type
-            let expGained = 10;
-            if (crop.cropType === 'rice') expGained = 10;
-            else if (crop.cropType === 'vegetable') expGained = 25;
-            else if (crop.cropType === 'fruit') expGained = 50;
-            else if (crop.cropType === 'golden_tree') expGained = 100;
-            
+            // Add EXP based on crop type (from shared catalog)
+            const expGained = getCrop(crop.cropType)?.exp ?? 10;
+
             gainExp(client, player, expGained);
 
             await savePlayerToDb(player);
@@ -426,10 +535,8 @@ export class GameRoom extends Room<{ state: GameState }> {
             const itemType = data.cropType.startsWith('fish_') ? data.cropType : `crop_${data.cropType}`;
             let sellPrice = 0;
 
-            if (data.cropType === 'rice') sellPrice = 2;
-            else if (data.cropType === 'vegetable') sellPrice = 50;
-            else if (data.cropType === 'fruit') sellPrice = 100;
-            else if (data.cropType === 'golden_tree') sellPrice = 200;
+            const cropDef = getCrop(data.cropType);
+            if (cropDef) sellPrice = cropDef.sellPrice;
             else if (data.cropType === 'fish_common') sellPrice = 25;
             else if (data.cropType === 'fish_uncommon') sellPrice = 60;
             else if (data.cropType === 'fish_rare') sellPrice = 150;
@@ -438,8 +545,14 @@ export class GameRoom extends Room<{ state: GameState }> {
                 return;
             }
 
-            const totalEarnings = sellPrice * data.count;
-            if (deductFromInventory(player, itemType, data.count)) {
+            const count = Math.floor(Number(data.count));
+            if (!Number.isFinite(count) || count < 1) {
+                client.send('error', 'Invalid sell amount!');
+                return;
+            }
+
+            const totalEarnings = sellPrice * count;
+            if (deductFromInventory(player, itemType, count)) {
                 player.gold += totalEarnings;
                 await savePlayerToDb(player);
                 client.send('toast', { type: 'success', message: `Sold items for ${totalEarnings} Gold!` });
@@ -524,6 +637,11 @@ export class GameRoom extends Room<{ state: GameState }> {
             const player = this.state.players.get(client.sessionId);
             if (!player) return;
 
+            if (player.isSleeping) {
+                client.send('error', 'You are already sleeping!');
+                return;
+            }
+
             if (player.gold < 40) {
                 client.send('error', 'Need 40 Gold to sleep!');
                 return;
@@ -544,10 +662,10 @@ export class GameRoom extends Room<{ state: GameState }> {
                 } else {
                     // Fallback: If user disconnected during sleep, update energy in DB directly
                     try {
-                        const query = player.walletAddress 
-                            ? { walletAddress: player.walletAddress } 
+                        const where = player.walletAddress
+                            ? { walletAddress: player.walletAddress }
                             : { username: player.username };
-                        await User.updateOne(query, { energy: 100 });
+                        await prisma.user.update({ where, data: { energy: 100 } });
                         console.log(`[Sleep Offline Complete] Updated disconnected player ${player.username} energy to 100 in DB.`);
                     } catch (err) {
                         console.error('Failed to update sleeping disconnected user energy in DB:', err);
@@ -578,13 +696,19 @@ export class GameRoom extends Room<{ state: GameState }> {
                 return;
             }
 
+            const target = data.toolType || 'watering_can';
+            const currentDurability = target === 'fishing_rod' ? player.fishingRodDurability : player.wateringCanDurability;
+            if (currentDurability >= 100) {
+                client.send('error', 'Tool durability is already full!');
+                return;
+            }
+
             if (player.gold < cost) {
                 client.send('error', 'Not enough gold!');
                 return;
             }
 
             player.gold -= cost;
-            const target = data.toolType || 'watering_can';
             if (target === 'fishing_rod') {
                 player.fishingRodDurability = Math.min(100, player.fishingRodDurability + repairAmount);
                 client.send('toast', { type: 'success', message: 'Fishing Rod repaired!' });
@@ -815,6 +939,21 @@ export class GameRoom extends Room<{ state: GameState }> {
                 return;
             }
 
+            // Verify quest requirements server-side (mirrors HUD getQuestStatus)
+            const hasItem = (itemType: string) =>
+                (player.inventory.find(i => i.itemType === itemType)?.count ?? 0) >= 1;
+            let requirementMet = false;
+            if (data.questId === 'rice') requirementMet = hasItem('crop_rice');
+            else if (data.questId === 'vegy') requirementMet = hasItem('crop_vegetable');
+            else if (data.questId === 'apple') requirementMet = hasItem('crop_fruit');
+            else if (data.questId === 'gold') requirementMet = player.gold >= 500;
+            else if (data.questId === 'fish') requirementMet = hasItem('fish_common') || hasItem('fish_uncommon') || hasItem('fish_rare');
+
+            if (!requirementMet) {
+                client.send('error', 'Quest requirements not met yet!');
+                return;
+            }
+
             player.lastClaimedQuests.set(data.questId, now);
             gainExp(client, player, expReward);
 
@@ -857,17 +996,17 @@ export class GameRoom extends Room<{ state: GameState }> {
                     return;
                 }
 
-                const query = player.walletAddress 
-                    ? { walletAddress: player.walletAddress } 
+                const where = player.walletAddress
+                    ? { walletAddress: player.walletAddress }
                     : { username: player.username };
-                
-                const user = await User.findOne(query);
+
+                const user = await prisma.user.findUnique({ where });
                 if (!user) {
                     client.send('error', 'User not found in database!');
                     return;
                 }
 
-                const timePassed = now - (user.lastDailyChestClaim || 0);
+                const timePassed = now - Number(user.lastDailyChestClaim || 0);
 
                 if (timePassed < COOLDOWN) {
                     const timeLeft = COOLDOWN - timePassed;
@@ -892,10 +1031,14 @@ export class GameRoom extends Room<{ state: GameState }> {
                 const goldGained = Math.floor(Math.random() * 101) + 100;
                 player.gold += goldGained;
                 player.lastDailyChestClaim = now;
-                
-                user.lastDailyChestClaim = now;
-                user.gold = player.gold; // Keep in sync
-                await user.save();
+
+                await prisma.user.update({
+                    where,
+                    data: {
+                        lastDailyChestClaim: BigInt(now),
+                        gold: player.gold // Keep in sync
+                    }
+                });
 
                 client.send('toast', { 
                     type: 'success', 
@@ -914,10 +1057,11 @@ export class GameRoom extends Room<{ state: GameState }> {
 
             try {
                 // Find top 10 users by totalPlaytime (descending)
-                const topUsers = await User.find({})
-                    .sort({ totalPlaytime: -1 })
-                    .limit(10)
-                    .select('username totalPlaytime walletAddress');
+                const topUsers = await prisma.user.findMany({
+                    orderBy: { totalPlaytime: 'desc' },
+                    take: 10,
+                    select: { username: true, totalPlaytime: true, walletAddress: true }
+                });
 
                 const data = topUsers.map((u, index) => ({
                     rank: index + 1,
@@ -955,7 +1099,7 @@ export class GameRoom extends Room<{ state: GameState }> {
             }
 
             try {
-                const targetUser = await User.findOne({ username: { $regex: new RegExp(`^${targetUsername}$`, 'i') } });
+                const targetUser = await prisma.user.findFirst({ where: { username: { equals: targetUsername, mode: 'insensitive' } } });
                 if (!targetUser) {
                     client.send('toast', { type: 'error', message: `Player "${targetUsername}" not found.` });
                     return;
@@ -978,8 +1122,10 @@ export class GameRoom extends Room<{ state: GameState }> {
                     return;
                 }
 
-                targetUser.friendRequests.push(player.username);
-                await targetUser.save();
+                await prisma.user.update({
+                    where: { username: resolvedTargetUsername },
+                    data: { friendRequests: [...targetUser.friendRequests, player.username] }
+                });
 
                 // Find online player state in this room
                 let targetOnlinePlayer: PlayerState | undefined;
@@ -1018,16 +1164,16 @@ export class GameRoom extends Room<{ state: GameState }> {
             if (!requesterUsername) return;
 
             try {
-                const currentUserQuery = player.walletAddress 
-                    ? { walletAddress: player.walletAddress } 
+                const currentUserQuery = player.walletAddress
+                    ? { walletAddress: player.walletAddress }
                     : { username: player.username };
-                const currentUser = await User.findOne(currentUserQuery);
+                const currentUser = await prisma.user.findUnique({ where: currentUserQuery });
                 if (!currentUser) {
                     client.send('toast', { type: 'error', message: 'Your account was not found.' });
                     return;
                 }
 
-                const requesterUser = await User.findOne({ username: { $regex: new RegExp(`^${requesterUsername}$`, 'i') } });
+                const requesterUser = await prisma.user.findFirst({ where: { username: { equals: requesterUsername, mode: 'insensitive' } } });
                 if (!requesterUser) {
                     client.send('toast', { type: 'error', message: `Player "${requesterUsername}" not found.` });
                     return;
@@ -1035,17 +1181,23 @@ export class GameRoom extends Room<{ state: GameState }> {
 
                 const resolvedRequesterUsername = requesterUser.username;
 
-                currentUser.friendRequests = currentUser.friendRequests.filter((name: string) => name !== resolvedRequesterUsername);
-                if (!currentUser.friends.includes(resolvedRequesterUsername)) {
-                    currentUser.friends.push(resolvedRequesterUsername);
-                }
-                await currentUser.save();
+                const currentFriendRequests = currentUser.friendRequests.filter((name: string) => name !== resolvedRequesterUsername);
+                const currentFriends = currentUser.friends.includes(resolvedRequesterUsername)
+                    ? currentUser.friends
+                    : [...currentUser.friends, resolvedRequesterUsername];
+                await prisma.user.update({
+                    where: currentUserQuery,
+                    data: { friendRequests: currentFriendRequests, friends: currentFriends }
+                });
 
-                if (!requesterUser.friends.includes(player.username)) {
-                    requesterUser.friends.push(player.username);
-                }
-                requesterUser.friendRequests = requesterUser.friendRequests.filter((name: string) => name !== player.username);
-                await requesterUser.save();
+                const requesterFriends = requesterUser.friends.includes(player.username)
+                    ? requesterUser.friends
+                    : [...requesterUser.friends, player.username];
+                const requesterFriendRequests = requesterUser.friendRequests.filter((name: string) => name !== player.username);
+                await prisma.user.update({
+                    where: { username: resolvedRequesterUsername },
+                    data: { friends: requesterFriends, friendRequests: requesterFriendRequests }
+                });
 
                 // Update current player state in room
                 const reqIndex = player.friendRequests.indexOf(resolvedRequesterUsername);
@@ -1096,17 +1248,19 @@ export class GameRoom extends Room<{ state: GameState }> {
             if (!requesterUsername) return;
 
             try {
-                const currentUserQuery = player.walletAddress 
-                    ? { walletAddress: player.walletAddress } 
+                const currentUserQuery = player.walletAddress
+                    ? { walletAddress: player.walletAddress }
                     : { username: player.username };
-                const currentUser = await User.findOne(currentUserQuery);
+                const currentUser = await prisma.user.findUnique({ where: currentUserQuery });
                 if (!currentUser) {
                     client.send('toast', { type: 'error', message: 'Your account was not found.' });
                     return;
                 }
 
-                currentUser.friendRequests = currentUser.friendRequests.filter((name: string) => name !== requesterUsername);
-                await currentUser.save();
+                await prisma.user.update({
+                    where: currentUserQuery,
+                    data: { friendRequests: currentUser.friendRequests.filter((name: string) => name !== requesterUsername) }
+                });
 
                 const reqIndex = player.friendRequests.indexOf(requesterUsername);
                 if (reqIndex !== -1) player.friendRequests.splice(reqIndex, 1);
@@ -1143,12 +1297,14 @@ export class GameRoom extends Room<{ state: GameState }> {
             }
 
             try {
-                // Save private chat message to MongoDB
-                await Message.create({
-                    sender: player.username,
-                    receiver: targetUsername,
-                    text: text,
-                    timestamp: new Date()
+                // Save private chat message to Postgres
+                await prisma.message.create({
+                    data: {
+                        sender: player.username,
+                        receiver: targetUsername,
+                        text: text,
+                        timestamp: new Date()
+                    }
                 });
 
                 // Find the target friend's client connection in the room if online
@@ -1218,17 +1374,17 @@ export class GameRoom extends Room<{ state: GameState }> {
         } else {
             let dbUser;
             try {
-                // Find user in MongoDB, create if not found
+                // Find user in Postgres, create if not found
                 if (options.walletAddress) {
-                    dbUser = await User.findOne({ walletAddress: options.walletAddress });
+                    dbUser = await prisma.user.findUnique({ where: { walletAddress: options.walletAddress } });
                 } else {
-                    dbUser = await User.findOne({ username });
+                    dbUser = await prisma.user.findUnique({ where: { username } });
                 }
 
                 if (!dbUser) {
-                    const userFields: any = { 
-                        username, 
-                        clothesIndex: 1,
+                    const userFields: any = {
+                        username,
+                        avatarStyle: 1,
                         inventory: [
                             { itemType: 'seed_rice', count: 5 },
                             { itemType: 'seed_vegetable', count: 3 },
@@ -1239,13 +1395,13 @@ export class GameRoom extends Room<{ state: GameState }> {
                     if (options.walletAddress) {
                         userFields.walletAddress = options.walletAddress;
                     }
-                    dbUser = await User.create(userFields);
+                    dbUser = await prisma.user.create({ data: userFields });
                 }
             } catch (e) {
                 console.error('Error fetching user from database on join:', e);
             }
 
-            player.clothesIndex = dbUser?.clothesIndex ?? 1;
+            player.clothesIndex = dbUser?.avatarStyle ?? 1;
             if (dbUser) {
                 syncPlayerState(player, dbUser);
             }
@@ -1257,17 +1413,20 @@ export class GameRoom extends Room<{ state: GameState }> {
     async onLeave(client: Client, code?: number) {
         console.log(`${client.sessionId} left!`);
         const player = this.state.players.get(client.sessionId);
+        const joinTime = this.joinTimes.get(client.sessionId);
+        this.joinTimes.delete(client.sessionId);
+        this.fishingStartTimes.delete(client.sessionId);
+        this.preRolledFishing.delete(client.sessionId);
         if (player) {
-            const joinTime = this.joinTimes.get(client.sessionId);
             if (joinTime && !player.isGuest) {
                 const playSessionSeconds = Math.floor((Date.now() - joinTime) / 1000);
-                this.joinTimes.delete(client.sessionId);
                 try {
-                    const query = player.walletAddress 
-                        ? { walletAddress: player.walletAddress } 
+                    const where = player.walletAddress
+                        ? { walletAddress: player.walletAddress }
                         : { username: player.username };
-                    await User.updateOne(query, {
-                        $inc: { totalPlaytime: playSessionSeconds }
+                    await prisma.user.update({
+                        where,
+                        data: { totalPlaytime: { increment: playSessionSeconds } }
                     });
                 } catch (e) {
                     console.error(`Error updating playtime for ${player.username}:`, e);

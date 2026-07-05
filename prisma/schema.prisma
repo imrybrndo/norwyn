@@ -1,0 +1,147 @@
+// Prisma schema for Supabase (PostgreSQL)
+// Migrated from the previous MongoDB/Mongoose models.
+//
+// Design notes:
+// - Code uses camelCase; @map keeps the DB columns idiomatic snake_case.
+// - The old camelCase+snake_case duplicated fields (gold/offChainCoins/
+//   off_chain_coins, energy/currentEnergy/current_energy, avatarStyle/
+//   clothesIndex/avatar_style, etc.) collapse into a single field each.
+//   The Mongoose pre-save sync hooks are no longer needed.
+// - Embedded documents are flattened into columns or normalized into tables.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  // Prisma 7: connection URLs live in prisma.config.ts (for migrate/introspect)
+  // and are passed to PrismaClient via a driver adapter (for the app runtime).
+  // See server/db/prisma.ts and prisma.config.ts.
+}
+
+enum Role {
+  Farmer
+  Woodcutter
+  Fisher
+}
+
+enum Gender {
+  Male
+  Female
+}
+
+model User {
+  id            String  @id @default(uuid())
+  walletAddress String  @unique @map("wallet_address")
+  username      String  @unique
+  role          Role    @default(Farmer)
+  gender        Gender  @default(Male)
+  avatarStyle   Int     @default(1) @map("avatar_style")
+
+  // Currencies & stats (single source of truth; no more duplicated fields)
+  gold           Int @default(100)
+  energy         Int @default(100)
+  energyCapacity Int @default(100) @map("energy_capacity")
+  hunger         Int @default(100)
+  level          Int @default(1)
+  exp            Int @default(0)
+
+  // Tools (flattened from embedded objects)
+  wateringCanLevel      Int @default(1)   @map("watering_can_level")
+  wateringCanDurability Int @default(100) @map("watering_can_durability")
+  axeLevel              Int @default(1)   @map("axe_level")
+  axeDurability         Int @default(100) @map("axe_durability")
+  fishingRodLevel       Int @default(1)   @map("fishing_rod_level")
+  fishingRodDurability  Int @default(100) @map("fishing_rod_durability")
+
+  // Last position (flattened from embedded object)
+  lastMap String @default("farm") @map("last_map")
+  lastX   Int    @default(240)    @map("last_x")
+  lastY   Int    @default(240)    @map("last_y")
+
+  // Progression timers
+  lastDailyChestClaim BigInt @default(0) @map("last_daily_chest_claim")
+  totalPlaytime       Int    @default(0) @map("total_playtime")
+
+  // Map<string, number> of questId -> last claimed epoch ms
+  lastClaimedQuests Json @default("{}") @map("last_claimed_quests")
+
+  // Social (usernames). Kept as string arrays to mirror current behavior;
+  // can be normalized into a Friendship join table later if needed.
+  friends        String[] @default([])
+  friendRequests String[] @default([]) @map("friend_requests")
+
+  // Array of { itemType: string, count: number }. Stored as jsonb because the
+  // game loads/saves the whole inventory at once and never queries it per-item.
+  inventory Json @default("[]")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("users")
+}
+
+model FarmPlot {
+  id             String    @id @default(uuid())
+  plotId         String    @unique @map("plot_id")
+  ownerWallet    String    @map("owner_wallet")
+  plantedItemId  String?   @map("planted_item_id")
+  plantedAt      DateTime? @map("planted_at")
+  harvestReadyAt DateTime? @map("harvest_ready_at")
+  isWatered      Boolean   @default(false) @map("is_watered")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([ownerWallet])
+  @@map("farm_plots")
+}
+
+// Growing crops, keyed by tile ("tileX_tileY") — mirrors CropState in the
+// Colyseus room so plants survive server restarts. Timestamps are absolute
+// epoch ms, so growth continues even while the server is down.
+model Crop {
+  id        String  @id // "tileX_tileY"
+  tileX     Int     @map("tile_x")
+  tileY     Int     @map("tile_y")
+  cropType  String  @map("crop_type")
+  plantedAt BigInt  @map("planted_at")
+  readyAt   BigInt  @map("ready_at")
+  watered   Boolean @default(false)
+  ownerId   String  @map("owner_id") // username of the planter
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("crops")
+}
+
+model Message {
+  id        String   @id @default(uuid())
+  sender    String
+  receiver  String
+  text      String
+  timestamp DateTime @default(now())
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Fast retrieval of a conversation between two users
+  @@index([sender, receiver, timestamp])
+  @@map("messages")
+}
+
+model ApartmentBed {
+  id              String  @id @default(uuid())
+  bedId           Int     @unique @map("bed_id")
+  ownerWallet     String  @map("owner_wallet")
+  nftTokenAddress String? @map("nft_token_address")
+  isOccupied      Boolean @default(false) @map("is_occupied")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([ownerWallet])
+  @@map("apartment_beds")
+}
