@@ -6,9 +6,9 @@ export default defineConfig({
     migrations: {
         path: 'prisma/migrations',
     },
-    datasource: {
-        // Direct connection (port 5432) — used by `prisma migrate` / introspection.
-        // PgBouncer's transaction pooler (6543) can't run migrations.
-        url: env('DIRECT_URL'),
-    },
+    // Direct connection (port 5432) — used by `prisma migrate` / introspection.
+    // PgBouncer's transaction pooler (6543) can't run migrations.
+    // Only wired up when DIRECT_URL is set: `prisma generate` needs no database,
+    // and CI/build environments (e.g. Railway) may not define this variable.
+    ...(process.env.DIRECT_URL ? { datasource: { url: env('DIRECT_URL') } } : {}),
 });
