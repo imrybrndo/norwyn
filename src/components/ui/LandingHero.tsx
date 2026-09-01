@@ -21,6 +21,8 @@ import {
     BookOpen,
     Trophy,
     FileText,
+    Copy,
+    Check,
 } from 'lucide-react';
 import WalletButton from './WalletButton';
 
@@ -115,6 +117,7 @@ export default function LandingHero({
     const [mounted, setMounted] = useState(false);
     const [onlinePlayers, setOnlinePlayers] = useState(0);
     const [totalPlayers, setTotalPlayers] = useState(0);
+    const [caCopied, setCaCopied] = useState(false);
 
     const tokenCA = process.env.NEXT_PUBLIC_TOKEN_CA;
     const tokenGatingEnabled = !!tokenCA && isAddress(tokenCA);
@@ -169,6 +172,14 @@ export default function LandingHero({
         } else {
             onStartOnboarding();
         }
+    };
+
+    const handleCopyCA = () => {
+        if (!tokenCA) return;
+        navigator.clipboard.writeText(tokenCA).then(() => {
+            setCaCopied(true);
+            setTimeout(() => setCaCopied(false), 2000);
+        });
     };
 
     return (
@@ -233,6 +244,24 @@ export default function LandingHero({
                                 v0.1
                             </span>
                         </div>
+
+                        {tokenCA && (
+                            <button
+                                onClick={handleCopyCA}
+                                title="Copy contract address"
+                                className="group inline-flex items-center gap-2 px-3 py-1.5 bg-slate-900 border-2 border-slate-900 rounded-full text-white text-[9px] md:text-[10px] font-mono shadow-[3px_3px_0_0_#047857] hover:-translate-y-0.5 active:translate-y-0 active:shadow-none transition-all cursor-pointer mt-1"
+                            >
+                                <span className="font-pixel font-normal text-emerald-400 tracking-normal uppercase">CA</span>
+                                <span className="text-white/90">
+                                    {tokenCA.slice(0, 6)}...{tokenCA.slice(-4)}
+                                </span>
+                                {caCopied ? (
+                                    <Check className="w-3 h-3 text-emerald-400" />
+                                ) : (
+                                    <Copy className="w-3 h-3 text-white/60 group-hover:text-white transition-colors" />
+                                )}
+                            </button>
+                        )}
                     </motion.div>
 
                     <motion.p
