@@ -38,10 +38,10 @@ export default function FeaturesBento() {
             {/* Heading */}
             <div className="text-center mb-10 relative z-10">
                 <h2 className="text-xl md:text-3xl font-pixel text-slate-800 tracking-tight">
-                    Discover Helge Village
+                    Discover Norwyn Village
                 </h2>
                 <p className="text-slate-600 max-w-xl mx-auto text-xs md:text-sm mt-3 font-semibold">
-                    A cozy, gamified pasture where retro pixel art meets secure Solana Web3 technology.
+                    A cozy, gamified pasture where retro pixel art meets secure EVM Web3 technology.
                 </p>
             </div>
 
@@ -93,7 +93,7 @@ export default function FeaturesBento() {
                         
                         <div className="space-y-3 font-sans text-xs md:text-sm font-semibold text-slate-600 leading-relaxed">
                             <p>
-                                Helge Village features an active Web3 economy utilizing crypto assets (SPL Tokens on Solana) to coordinate in-game progression and reward systems.
+                                Norwyn Village features an active Web3 economy utilizing crypto assets (ERC-20 tokens on Robinhood Chain) to coordinate in-game progression and reward systems.
                             </p>
                             {/* <p className="border-l-4 border-orange-400 pl-4 py-1.5 bg-orange-50/50 rounded-r-xl border-r border-t border-b border-slate-200">
                                 <strong className="text-slate-800">Important:</strong> In compliance with our creator assets license, there are absolutely <span className="text-orange-650 underline font-bold">NO sales of visual assets, character skins, or environment designs as NFTs</span>. Everything is earned through gameplay!
@@ -102,7 +102,7 @@ export default function FeaturesBento() {
                             <div className="pt-4 border-t border-slate-100 flex items-start gap-2 text-[10px] text-slate-505 font-bold">
                                 <Info className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
                                 <p>
-                                    Helge Village is entirely free to play. Content in this game is Not Financial Advice (NFA). We encourage all players to prioritize relaxing and casual gameplay.
+                                    Norwyn Village is entirely free to play. Content in this game is Not Financial Advice (NFA). We encourage all players to prioritize relaxing and casual gameplay.
                                 </p>
                             </div>
                         </div>

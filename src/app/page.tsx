@@ -1,7 +1,9 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { useWallet } from '@solana/wallet-adapter-react';
+import { useAccount, useSignMessage } from 'wagmi';
+import { SiweMessage } from 'siwe';
+import { robinhoodChain } from '../lib/chains';
 import { Volume2, VolumeX } from 'lucide-react';
 import GameLoader from '../components/GameLoader';
 import HUD from '../components/ui/HUD';
@@ -27,7 +29,9 @@ export default function Home() {
 
     const toggleSound = () => setIsSoundActive(prev => !prev);
 
-    const { connected, publicKey } = useWallet();
+    const { address, isConnected } = useAccount();
+    const { signMessageAsync } = useSignMessage();
+    const [authAddress, setAuthAddress] = useState<string | null>(null);
     const [gameState, setGameState] = useState<{
         inGame: boolean;
         username: string;
@@ -49,20 +53,84 @@ export default function Home() {
     const [showOnboarding, setShowOnboarding] = useState(false);
     const [isSubmittingOnboarding, setIsSubmittingOnboarding] = useState(false);
 
-    // Fetch user profile whenever wallet is connected
+    const wasConnectedRef = useRef(false);
     useEffect(() => {
-        if (connected && publicKey) {
-            fetchUserProfile(publicKey.toBase58());
-        } else {
+        if (isConnected) {
+            wasConnectedRef.current = true;
+        } else if (wasConnectedRef.current) {
+            wasConnectedRef.current = false;
+            fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
+        }
+    }, [isConnected]);
+
+    // Sign in with Ethereum whenever a wallet connects, then load its save data
+    useEffect(() => {
+        if (!isConnected || !address) {
+            setAuthAddress(null);
             setUserData(null);
             setShowOnboarding(false);
+            return;
         }
-    }, [connected, publicKey]);
 
-    const fetchUserProfile = async (address: string) => {
+        let cancelled = false;
+
+        const authenticate = async () => {
+            try {
+                const sessionRes = await fetch('/api/auth/session');
+                if (sessionRes.ok) {
+                    const { address: sessionAddress } = await sessionRes.json();
+                    if (sessionAddress?.toLowerCase() === address.toLowerCase()) {
+                        if (!cancelled) {
+                            setAuthAddress(sessionAddress);
+                            fetchUserProfile();
+                        }
+                        return;
+                    }
+                }
+            } catch (error) {
+                console.error('Error checking session:', error);
+            }
+
+            try {
+                const nonceRes = await fetch('/api/auth/nonce');
+                const { nonce } = await nonceRes.json();
+
+                const siweMessage = new SiweMessage({
+                    domain: window.location.host,
+                    address,
+                    statement: 'Sign in to Norwyn Village.',
+                    uri: window.location.origin,
+                    version: '1',
+                    chainId: robinhoodChain.id,
+                    nonce,
+                }).prepareMessage();
+
+                const signature = await signMessageAsync({ message: siweMessage });
+
+                const verifyRes = await fetch('/api/auth/verify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: siweMessage, signature }),
+                });
+
+                if (verifyRes.ok && !cancelled) {
+                    const { address: verifiedAddress } = await verifyRes.json();
+                    setAuthAddress(verifiedAddress);
+                    fetchUserProfile();
+                }
+            } catch (error) {
+                console.error('Error signing in with Ethereum:', error);
+            }
+        };
+
+        authenticate();
+        return () => { cancelled = true; };
+    }, [isConnected, address]);
+
+    const fetchUserProfile = async () => {
         setIsLoadingUser(true);
         try {
-            const res = await fetch(`/api/user?walletAddress=${address}`);
+            const res = await fetch('/api/user');
             if (res.ok) {
                 const data = await res.json();
                 setUserData(data);
@@ -95,14 +163,13 @@ export default function Home() {
         gender: string;
         avatarStyle: number;
     }) => {
-        if (!publicKey) return;
+        if (!authAddress) return;
         setIsSubmittingOnboarding(true);
         try {
             const res = await fetch('/api/user', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    walletAddress: publicKey.toBase58(),
                     username: data.username,
                     role: data.role,
                     clothesIndex: data.clothesIndex,
@@ -128,13 +195,13 @@ export default function Home() {
     };
 
     const handleEnterGame = () => {
-        if (!userData || !publicKey) return;
+        if (!userData || !authAddress) return;
         setGameState({
             inGame: true,
             username: userData.username,
             // The API returns the Prisma user, whose field is avatarStyle
             clothesIndex: userData.avatarStyle ?? 1,
-            walletAddress: publicKey.toBase58(),
+            walletAddress: authAddress,
             isOnline: true,
             isGuest: false
         });
@@ -176,11 +243,11 @@ export default function Home() {
                             />
                             <footer className="w-full border-t border-white/10 py-3.5 text-center text-[11px] text-slate-300 font-bold bg-slate-950/40 backdrop-blur-sm relative flex items-center justify-center gap-2">
                                 <span className="drop-shadow-[0_1px_1px_rgba(0,0,0,0.6)]">
-                                    &copy; {new Date().getFullYear()} Helge Village
+                                    &copy; {new Date().getFullYear()} Norwyn Village
                                     <span className="hidden sm:inline text-slate-500"> · </span>
                                     <span className="hidden sm:inline">All Rights Reserved</span>
                                     <span className="text-slate-500"> · </span>
-                                    <span className="text-emerald-400">Built on Solana</span>
+                                    <span className="text-emerald-400">Built on Robinhood Chain</span>
                                 </span>
 
                                 <button

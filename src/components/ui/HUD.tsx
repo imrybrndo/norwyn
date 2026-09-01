@@ -1169,7 +1169,7 @@ export default function HUD() {
                                 </button>
 
                                 <div className="text-center text-[8px] text-gray-550 border-t border-gray-800 pt-2 font-mono mt-2">
-                                    Helge Village Web3 MMO v0.2.0 • Built on Solana
+                                    Norwyn Village Web3 MMO v0.2.0 • Built on Robinhood Chain
                                 </div>
                             </div>
                         </div>

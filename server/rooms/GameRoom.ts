@@ -1,7 +1,10 @@
 import { Room, Client } from '@colyseus/core';
+import type { AuthContext } from '@colyseus/core';
+import { parse as parseCookie } from 'cookie';
 import { GameState, PlayerState, InventoryItemState, CropState } from './schema/GameState';
 import prisma from '../db/prisma';
 import { CROP_CATALOG, getCrop, getCropBySeed } from '../../shared/crops';
+import { verifySession, SESSION_COOKIE } from '../../src/lib/auth';
 import fs from 'fs';
 import path from 'path';
 
@@ -1338,6 +1341,18 @@ export class GameRoom extends Room<{ state: GameState }> {
         });
     }
 
+    async onAuth(client: Client, options: { isGuest?: boolean }, context: AuthContext) {
+        if (options.isGuest) return {};
+
+        const cookies = parseCookie(context.headers.get('cookie') || '');
+        const session = await verifySession(cookies[SESSION_COOKIE]);
+        if (!session) {
+            throw new Error('Unauthorized: a verified wallet session is required to join.');
+        }
+
+        return { walletAddress: session.address };
+    }
+
     async onJoin(client: Client, options: { username: string; walletAddress?: string; isGuest?: boolean }) {
         console.log(`${client.sessionId} joined!`);
         this.joinTimes.set(client.sessionId, Date.now());
@@ -1372,11 +1387,12 @@ export class GameRoom extends Room<{ state: GameState }> {
             addToInventory(player, 'food_bread', 1);
             addToInventory(player, 'fishing_rod', 1);
         } else {
+            const walletAddress = (client.auth as { walletAddress?: string } | undefined)?.walletAddress;
             let dbUser;
             try {
                 // Find user in Postgres, create if not found
-                if (options.walletAddress) {
-                    dbUser = await prisma.user.findUnique({ where: { walletAddress: options.walletAddress } });
+                if (walletAddress) {
+                    dbUser = await prisma.user.findUnique({ where: { walletAddress } });
                 } else {
                     dbUser = await prisma.user.findUnique({ where: { username } });
                 }
@@ -1392,8 +1408,8 @@ export class GameRoom extends Room<{ state: GameState }> {
                             { itemType: 'food_bread', count: 1 }
                         ]
                     };
-                    if (options.walletAddress) {
-                        userFields.walletAddress = options.walletAddress;
+                    if (walletAddress) {
+                        userFields.walletAddress = walletAddress;
                     }
                     dbUser = await prisma.user.create({ data: userFields });
                 }

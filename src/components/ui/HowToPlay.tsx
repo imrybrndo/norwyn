@@ -67,7 +67,7 @@ export default function HowToPlay() {
                     transition={{ duration: 0.6 }}
                     className="text-2xl md:text-4xl font-pixel text-slate-800 tracking-tight"
                 >
-                    Discover Helge Village
+                    Discover Norwyn Village
                 </motion.h2>
                 <motion.p 
                     initial={{ opacity: 0 }}
@@ -76,7 +76,7 @@ export default function HowToPlay() {
                     transition={{ delay: 0.2, duration: 0.6 }}
                     className="text-slate-500 max-w-xl mx-auto text-sm md:text-base mt-4 font-semibold"
                 >
-                    A cozy, gamified pasture where retro pixel art meets secure Solana Web3 technology.
+                    A cozy, gamified pasture where retro pixel art meets secure EVM Web3 technology.
                 </motion.p>
             </div>
 
@@ -143,7 +143,7 @@ export default function HowToPlay() {
                         
                         <div className="space-y-3 font-sans text-sm font-semibold text-slate-600 leading-relaxed">
                             <p>
-                                Helge Village features an active Web3 economy utilizing crypto assets (SPL Tokens on Solana) to coordinate in-game progression and reward systems.
+                                Norwyn Village features an active Web3 economy utilizing crypto assets (ERC-20 tokens on Robinhood Chain) to coordinate in-game progression and reward systems.
                             </p>
                             {/* <p className="border-l-4 border-orange-400 pl-4 py-1 bg-orange-50/50 rounded-r-xl">
                                 <strong className="text-slate-800">Important:</strong> In compliance with our creator assets license, there are absolutely <span className="text-orange-600 underline decoration-2">NO sales of visual assets, character skins, or environment designs as NFTs</span>. Everything is earned through gameplay!
@@ -152,7 +152,7 @@ export default function HowToPlay() {
                             <div className="pt-4 border-t-2 border-slate-100 flex items-start gap-2 text-xs text-slate-500 font-bold">
                                 <Info className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
                                 <p>
-                                    Helge Village is entirely free to play. Content in this game is Not Financial Advice (NFA). We encourage all players to prioritize relaxing and casual gameplay.
+                                    Norwyn Village is entirely free to play. Content in this game is Not Financial Advice (NFA). We encourage all players to prioritize relaxing and casual gameplay.
                                 </p>
                             </div>
                         </div>

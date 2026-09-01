@@ -1,13 +1,12 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useWallet } from '@solana/wallet-adapter-react';
-import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Menu, X } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
+import WalletButton from './WalletButton';
 
 export default function Navbar() {
     const [mounted, setMounted] = useState(false);
@@ -37,7 +36,7 @@ export default function Navbar() {
                     <div className="relative w-8 h-8 group-hover:scale-105 transition-transform duration-200">
                         <Image 
                             src="/Logo-Transparant.png" 
-                            alt="Helge Village Logo" 
+                            alt="Norwyn Village Logo" 
                             fill
                             sizes="32px"
                             priority
@@ -46,7 +45,7 @@ export default function Navbar() {
                         />
                     </div>
                     <span className="hidden sm:inline-block font-pixel text-[10px] md:text-xs tracking-normal text-slate-800 uppercase select-none">
-                        Helge Village
+                        Norwyn Village
                     </span>
                 </Link>
 
@@ -69,7 +68,7 @@ export default function Navbar() {
                         );
                     })}
                     <a
-                        href="https://x.com/helgevillage"
+                        href="https://x.com/norwynvillage"
                         target="_blank"
                         rel="noopener noreferrer"
                         className="px-3 py-1.5 rounded-full text-xs font-bold text-slate-605 hover:text-slate-800 transition-colors flex items-center justify-center"
@@ -85,8 +84,8 @@ export default function Navbar() {
                 <div className="flex items-center gap-1.5 min-[400px]:gap-2">
                     <div className="transform hover:scale-102 active:scale-98 transition-all">
                         {mounted && (
-                            <WalletMultiButton 
-                                className="!bg-orange-500 hover:!bg-orange-600 !text-white !border-2 !border-slate-800 !font-sans !text-[9px] min-[400px]:!text-[11px] md:!text-xs !font-bold !rounded-full !h-9 !px-2 min-[400px]:!px-4 !shadow-[2px_2px_0_0_#1e293b] active:!translate-y-[1px] active:!shadow-[1px_1px_0_0_#1e293b] !transition-all" 
+                            <WalletButton
+                                className="bg-orange-500 hover:bg-orange-600 text-white border-2 border-slate-800 font-sans text-[9px] min-[400px]:text-[11px] md:text-xs font-bold rounded-full h-9 px-2 min-[400px]:px-4 shadow-[2px_2px_0_0_#1e293b] active:translate-y-[1px] active:shadow-[1px_1px_0_0_#1e293b] transition-all cursor-pointer"
                             />
                         )}
                     </div>
@@ -129,7 +128,7 @@ export default function Navbar() {
                                 );
                             })}
                             <a
-                                href="https://x.com/helgevillage"
+                                href="https://x.com/norwynvillage"
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 onClick={() => setIsOpen(false)}

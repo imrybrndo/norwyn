@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
 import prisma from '../../../../server/db/prisma';
+import { verifySession, SESSION_COOKIE } from '@/lib/auth';
 
 // lastDailyChestClaim is a BigInt column; JSON can't serialize BigInt, so
 // convert it to a number before returning the user.
@@ -7,13 +9,17 @@ function serializeUser<T extends { lastDailyChestClaim: bigint }>(user: T) {
     return { ...user, lastDailyChestClaim: Number(user.lastDailyChestClaim) };
 }
 
-export async function GET(request: Request) {
-    try {
-        const { searchParams } = new URL(request.url);
-        const walletAddress = searchParams.get('walletAddress');
+async function getSessionAddress() {
+    const cookieStore = await cookies();
+    const session = await verifySession(cookieStore.get(SESSION_COOKIE)?.value);
+    return session?.address ?? null;
+}
 
+export async function GET() {
+    try {
+        const walletAddress = await getSessionAddress();
         if (!walletAddress) {
-            return NextResponse.json({ error: 'Missing walletAddress parameter' }, { status: 400 });
+            return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
         }
 
         const user = await prisma.user.findUnique({ where: { walletAddress } });
@@ -30,11 +36,16 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
     try {
-        const body = await request.json();
-        const { walletAddress, username, role, clothesIndex, gender, avatarStyle } = body;
+        const walletAddress = await getSessionAddress();
+        if (!walletAddress) {
+            return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+        }
 
-        if (!walletAddress || !username) {
-            return NextResponse.json({ error: 'Missing walletAddress or username' }, { status: 400 });
+        const body = await request.json();
+        const { username, role, clothesIndex, gender, avatarStyle } = body;
+
+        if (!username) {
+            return NextResponse.json({ error: 'Missing username' }, { status: 400 });
         }
 
         // Check if user already exists

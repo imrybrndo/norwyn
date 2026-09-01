@@ -3,16 +3,15 @@
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { useConnection, useWallet } from '@solana/wallet-adapter-react';
-import { WalletMultiButton, useWalletModal } from '@solana/wallet-adapter-react-ui';
+import { useAccount, useReadContract } from 'wagmi';
+import { useConnectModal } from '@rainbow-me/rainbowkit';
+import { formatUnits, isAddress } from 'viem';
 import { motion, type Variants } from 'framer-motion';
 import {
     Sparkles,
     ArrowRight,
     ShieldCheck,
     AlertTriangle,
-    Copy,
-    Check,
     UserPlus,
     Sprout,
     Fish,
@@ -23,7 +22,24 @@ import {
     Trophy,
     FileText,
 } from 'lucide-react';
-import { PublicKey } from '@solana/web3.js';
+import WalletButton from './WalletButton';
+
+const ERC20_ABI = [
+    {
+        type: 'function',
+        name: 'balanceOf',
+        stateMutability: 'view',
+        inputs: [{ name: 'account', type: 'address' }],
+        outputs: [{ name: '', type: 'uint256' }],
+    },
+    {
+        type: 'function',
+        name: 'decimals',
+        stateMutability: 'view',
+        inputs: [],
+        outputs: [{ name: '', type: 'uint8' }],
+    },
+] as const;
 
 interface LandingHeroProps {
     userData: any;
@@ -94,27 +110,38 @@ export default function LandingHero({
     onEnterGame,
     onEnterGameAsGuest,
 }: LandingHeroProps) {
-    const { connection } = useConnection();
-    const { connected, publicKey } = useWallet();
-    const { setVisible } = useWalletModal();
+    const { address, isConnected } = useAccount();
+    const { openConnectModal } = useConnectModal();
     const [mounted, setMounted] = useState(false);
     const [onlinePlayers, setOnlinePlayers] = useState(0);
     const [totalPlayers, setTotalPlayers] = useState(0);
-    const [tokenBalance, setTokenBalance] = useState<number | null>(null);
-    const [isCheckingToken, setIsCheckingToken] = useState(false);
-    const [copied, setCopied] = useState(false);
 
-    const contractAddress = process.env.NEXT_PUBLIC_TOKEN_CA || '3XQ3DEkgy8mPe8Sz97degTmtntJWbm7tiDhh1kMupump';
+    const tokenCA = process.env.NEXT_PUBLIC_TOKEN_CA;
+    const tokenGatingEnabled = !!tokenCA && isAddress(tokenCA);
 
-    const handleCopyCA = async () => {
-        try {
-            await navigator.clipboard.writeText(contractAddress);
-            setCopied(true);
-            setTimeout(() => setCopied(false), 1500);
-        } catch (err) {
-            console.error('Failed to copy contract address:', err);
-        }
-    };
+    const { data: rawBalance, isFetching: isFetchingBalance } = useReadContract({
+        address: tokenGatingEnabled ? (tokenCA as `0x${string}`) : undefined,
+        abi: ERC20_ABI,
+        functionName: 'balanceOf',
+        args: address ? [address] : undefined,
+        query: { enabled: tokenGatingEnabled && isConnected && !!address },
+    });
+
+    const { data: tokenDecimals } = useReadContract({
+        address: tokenGatingEnabled ? (tokenCA as `0x${string}`) : undefined,
+        abi: ERC20_ABI,
+        functionName: 'decimals',
+        query: { enabled: tokenGatingEnabled },
+    });
+
+    const isCheckingToken = tokenGatingEnabled && isConnected && isFetchingBalance && rawBalance === undefined;
+    const tokenBalance = !tokenGatingEnabled
+        ? Infinity
+        : !isConnected
+            ? null
+            : rawBalance !== undefined
+                ? Number(formatUnits(rawBalance, tokenDecimals ?? 18))
+                : null;
 
     useEffect(() => {
         setMounted(true);
@@ -134,48 +161,9 @@ export default function LandingHero({
         return () => clearInterval(interval);
     }, []);
 
-    useEffect(() => {
-        const checkBalance = async () => {
-            if (!connected || !publicKey) {
-                setTokenBalance(null);
-                return;
-            }
-
-            const tokenCA = process.env.NEXT_PUBLIC_TOKEN_CA;
-            if (!tokenCA) {
-                // If no CA is configured, we can assume balance is sufficient or ignore check
-                setTokenBalance(Infinity);
-                return;
-            }
-
-            setIsCheckingToken(true);
-            try {
-                const mintPubKey = new PublicKey(tokenCA);
-                const response = await connection.getParsedTokenAccountsByOwner(publicKey, {
-                    mint: mintPubKey,
-                });
-
-                let totalAmount = 0;
-                for (const accountInfo of response.value) {
-                    const amountStr = accountInfo.account.data.parsed.info.tokenAmount.uiAmountString;
-                    totalAmount += parseFloat(amountStr) || 0;
-                }
-
-                setTokenBalance(totalAmount);
-            } catch (error) {
-                console.error('Error checking token balance:', error);
-                setTokenBalance(0);
-            } finally {
-                setIsCheckingToken(false);
-            }
-        };
-
-        checkBalance();
-    }, [connected, publicKey, connection]);
-
     const handlePlayNow = () => {
-        if (!connected) {
-            setVisible(true);
+        if (!isConnected) {
+            openConnectModal?.();
         } else if (userData) {
             onEnterGame();
         } else {
@@ -219,7 +207,7 @@ export default function LandingHero({
                         >
                             <Image
                                 src="/Logo-Transparant.png"
-                                alt="Helge Village"
+                                alt="Norwyn Village"
                                 fill
                                 sizes="80px"
                                 priority
@@ -230,7 +218,7 @@ export default function LandingHero({
 
                         <h1 className="font-pixel leading-none tracking-tight flex flex-col items-center md:items-start">
                             <span className="text-3xl md:text-5xl lg:text-6xl text-amber-300 drop-shadow-[0_4px_0_#1e293b] [-webkit-text-stroke:1.5px_#1e293b]">
-                                HELGE
+                                NORWYN
                             </span>
                             <span className="text-3xl md:text-5xl lg:text-6xl text-white drop-shadow-[0_4px_0_#1e293b] [-webkit-text-stroke:1.5px_#1e293b] mt-1 md:mt-2">
                                 VILLAGE
@@ -238,7 +226,7 @@ export default function LandingHero({
                         </h1>
 
                         <span className="inline-flex items-center gap-1.5 bg-orange-500 text-white border-2 border-slate-900 rounded-lg px-2.5 py-1 text-[9px] md:text-[10px] font-black uppercase tracking-widest shadow-[3px_3px_0_0_#1e293b] mt-1">
-                            <Sparkles className="w-3 h-3" /> A Cozy Web3 Farm on Solana
+                            <Sparkles className="w-3 h-3" /> A Cozy Web3 Farm on Robinhood Chain
                         </span>
                     </motion.div>
 
@@ -268,21 +256,8 @@ export default function LandingHero({
                         })}
                     </motion.div>
 
-                    {/* CA chip + version */}
+                    {/* Version tag */}
                     <motion.div variants={itemVariants} className="flex items-center gap-2 max-w-full">
-                        <button
-                            onClick={handleCopyCA}
-                            title="Copy contract address"
-                            className="group inline-flex items-center gap-1.5 min-w-0 px-2.5 py-1 bg-white/85 hover:bg-white border border-slate-900/70 rounded-full text-slate-700 shadow-[1px_1px_0_0_rgba(30,41,59,0.5)] hover:-translate-y-0.5 active:translate-y-0 transition-all cursor-pointer backdrop-blur-sm"
-                        >
-                            <span className="text-emerald-700 border-r border-slate-300 pr-1.5 text-[8px] md:text-[9px] font-black uppercase tracking-wider shrink-0">CA</span>
-                            <span className="font-mono text-[9px] md:text-[10px] truncate font-semibold">{contractAddress}</span>
-                            {copied ? (
-                                <Check className="w-3 h-3 text-emerald-600 shrink-0" />
-                            ) : (
-                                <Copy className="w-3 h-3 text-slate-400 group-hover:text-slate-800 shrink-0" />
-                            )}
-                        </button>
                         <span className="font-pixel text-[8px] md:text-[9px] text-white/70 drop-shadow-[0_1px_1px_rgba(0,0,0,0.6)] shrink-0">
                             v0.1
                         </span>
@@ -333,7 +308,7 @@ export default function LandingHero({
                                     <div className="w-full h-12 bg-orange-200/70 rounded-2xl animate-pulse border-2 border-slate-300" />
                                     <div className="w-full h-10 bg-slate-200/70 rounded-2xl animate-pulse border-2 border-slate-300" />
                                 </div>
-                            ) : !connected ? (
+                            ) : !isConnected ? (
                                 <div className="flex flex-col items-center gap-3 w-full">
                                     <MenuButton onClick={handlePlayNow} color="orange">
                                         START GAME
@@ -351,7 +326,7 @@ export default function LandingHero({
                                     <div className="px-3 py-1.5 bg-white border-2 border-slate-900 rounded-xl text-xs font-black text-slate-800 flex items-center gap-2 shadow-[2px_2px_0_0_#1e293b]">
                                         <ShieldCheck className="w-4 h-4 text-emerald-600" />
                                         <span className="font-mono">
-                                            {publicKey?.toBase58().substring(0, 6)}...{publicKey?.toBase58().substring(publicKey.toBase58().length - 6)}
+                                            {address?.substring(0, 6)}...{address?.substring(address.length - 4)}
                                         </span>
                                     </div>
 
@@ -366,7 +341,7 @@ export default function LandingHero({
                                                 Access Denied
                                             </p>
                                             <p className="text-slate-700 text-[10px] text-center font-semibold">
-                                                You need at least {Number(process.env.NEXT_PUBLIC_REQUIRED_TOKEN_AMOUNT || 400000).toLocaleString()} Helge tokens to play.
+                                                You need at least {Number(process.env.NEXT_PUBLIC_REQUIRED_TOKEN_AMOUNT || 400000).toLocaleString()} Norwyn tokens to play.
                                                 <br />
                                                 Your balance: <span className="font-bold">{tokenBalance.toLocaleString()}</span>
                                             </p>
@@ -408,7 +383,7 @@ export default function LandingHero({
 
                                     {/* Disconnect helper */}
                                     {mounted && (
-                                        <WalletMultiButton className="!bg-white hover:!bg-slate-100 !text-slate-700 hover:!text-slate-900 !font-sans !text-xs !font-bold !h-9 !px-4 !border-2 !border-slate-900 !rounded-xl !shadow-[2px_2px_0_0_#1e293b] active:!translate-y-[1px] active:!shadow-none !transition-all" />
+                                        <WalletButton className="bg-white hover:bg-slate-100 text-slate-700 hover:text-slate-900 font-sans text-xs font-bold h-9 px-4 border-2 border-slate-900 rounded-xl shadow-[2px_2px_0_0_#1e293b] active:translate-y-[1px] active:shadow-none transition-all cursor-pointer" />
                                     )}
                                 </div>
                             )}
@@ -439,7 +414,7 @@ export default function LandingHero({
                                     <FileText className="w-3.5 h-3.5 text-sky-600" /> Docs
                                 </Link>
                                 <a
-                                    href="https://x.com/helgevillage"
+                                    href="https://x.com/norwynvillage"
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="flex items-center justify-center gap-1.5 py-2 px-2 bg-white border-2 border-slate-900 rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-wide text-slate-700 shadow-[2px_2px_0_0_#1e293b] hover:-translate-y-0.5 hover:bg-slate-50 active:translate-y-[1px] active:shadow-none transition-all"

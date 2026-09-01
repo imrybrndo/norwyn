@@ -37,9 +37,9 @@ export default function DocsPage() {
                     icon: BookOpen,
                     content: (
                         <div className="space-y-4">
-                            <h2 className="text-xl md:text-2xl font-pixel text-slate-800">Welcome to Helge Village</h2>
+                            <h2 className="text-xl md:text-2xl font-pixel text-slate-800">Welcome to Norwyn Village</h2>
                             <p className="text-slate-655 leading-relaxed text-sm">
-                                <strong>Helge Village</strong> is a browser-based, multiplayer 2D Top-Down Farming RPG built with Next.js, React, Tailwind CSS, Phaser, and Colyseus. Players can plant crops, raise their levels, buy food, repair tools, and explore a shared persistent world in real-time.
+                                <strong>Norwyn Village</strong> is a browser-based, multiplayer 2D Top-Down Farming RPG built with Next.js, React, Tailwind CSS, Phaser, and Colyseus. Players can plant crops, raise their levels, buy food, repair tools, and explore a shared persistent world in real-time.
                             </p>
                             <div className="bg-emerald-50 border-2 border-emerald-600/30 p-4 rounded-2xl text-slate-700 text-xs md:text-sm shadow-[2px_2px_0_0_#10b98122]">
                                 <h4 className="font-bold text-emerald-800 uppercase tracking-wide mb-1 flex items-center gap-1.5">
@@ -59,9 +59,9 @@ export default function DocsPage() {
                     icon: Wallet,
                     content: (
                         <div className="space-y-4">
-                            <h2 className="text-xl md:text-2xl font-pixel text-slate-800">Solana Wallet Connection</h2>
+                            <h2 className="text-xl md:text-2xl font-pixel text-slate-800">Wallet Connection</h2>
                             <p className="text-slate-655 leading-relaxed text-sm">
-                                Helge Village integrates Web3 wallets (such as <strong>Phantom</strong> or <strong>Solflare</strong>) using standard Solana adapters. Connect your wallet to start playing.
+                                Norwyn Village integrates EVM Web3 wallets (such as <strong>MetaMask</strong>, <strong>Rainbow</strong>, or <strong>Coinbase Wallet</strong>) via RainbowKit, connecting to Robinhood Chain. Connect your wallet to start playing.
                             </p>
                             <div className="bg-amber-50 border-2 border-amber-600/30 p-4 rounded-2xl text-slate-700 text-xs md:text-sm">
                                 <h4 className="font-bold text-amber-800 uppercase tracking-wide mb-1">💡 Your Wallet Security</h4>
@@ -105,7 +105,7 @@ export default function DocsPage() {
                     icon: Map,
                     content: (
                         <div className="space-y-4">
-                            <h2 className="text-xl md:text-2xl font-pixel text-slate-800">Helge Village (Main Town)</h2>
+                            <h2 className="text-xl md:text-2xl font-pixel text-slate-800">Norwyn Village (Main Town)</h2>
                             <p className="text-slate-655 leading-relaxed text-sm">
                                 The main game map is designed in a retro 2D pixel art style. Players spawn at the center coordinates `(240, 240)`. The village is surrounded by paths, trees, freshwater ponds for fishing, and essential facilities.
                             </p>
@@ -147,7 +147,7 @@ export default function DocsPage() {
                         <div className="space-y-4">
                             <h2 className="text-xl md:text-2xl font-pixel text-slate-800">Village Facilities</h2>
                             <p className="text-slate-655 leading-relaxed text-sm">
-                                Helge Village provides 4 main facilities that you can interact with by pressing [E] when standing nearby:
+                                Norwyn Village provides 4 main facilities that you can interact with by pressing [E] when standing nearby:
                             </p>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="border-2 border-slate-800 p-4 rounded-2xl bg-white shadow-[2px_2px_0_0_#1e293b]">
@@ -183,7 +183,7 @@ export default function DocsPage() {
                         <div className="space-y-4">
                             <h2 className="text-xl md:text-2xl font-pixel text-slate-800">Core Gameplay Loop</h2>
                             <p className="text-slate-655 leading-relaxed text-sm">
-                                The core gameplay loop of Helge Village is cozy yet tactical:
+                                The core gameplay loop of Norwyn Village is cozy yet tactical:
                             </p>
                             <div className="relative border-l-4 border-emerald-500 pl-6 space-y-4 my-2 text-sm text-slate-655">
                                 <div>
@@ -714,7 +714,7 @@ export default function DocsPage() {
 
             {/* Footer */}
             <footer className="w-full max-w-6xl mx-auto border-t border-slate-200 mt-12 py-8 text-center text-xs text-slate-450 font-bold px-4">
-                &copy; {new Date().getFullYear()} Helge Village. All Rights Reserved. Built on Solana.
+                &copy; {new Date().getFullYear()} Norwyn Village. All Rights Reserved. Built on Robinhood Chain.
             </footer>
         </div>
     );

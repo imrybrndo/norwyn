@@ -37,12 +37,12 @@ export default function HowToPlayPage() {
                     title: 'Wallet Connection',
                     icon: Wallet,
                     imagePath: '/img/img1.png',
-                    screenshotDesc: 'Connect your Phantom or Solflare wallet to start your farming adventure.',
+                    screenshotDesc: 'Connect your MetaMask or other EVM wallet to start your farming adventure.',
                     content: (
                         <div className="space-y-4">
                             <h2 className="text-xl md:text-2xl font-pixel text-slate-800">1. Connect Your Wallet</h2>
                             <p className="text-slate-655 leading-relaxed text-sm">
-                                To enter the world of <strong>Helge Village</strong>, you need a Solana Web3 wallet like <strong>Phantom</strong> or <strong>Solflare</strong>.
+                                To enter the world of <strong>Norwyn Village</strong>, you need an EVM Web3 wallet like <strong>MetaMask</strong>, <strong>Rainbow</strong>, or <strong>Coinbase Wallet</strong>.
                             </p>
                             <div className="bg-emerald-50 border-2 border-emerald-600/30 p-4 rounded-2xl text-slate-700 text-xs md:text-sm">
                                 <h4 className="font-bold text-emerald-800 uppercase tracking-wide mb-1 flex items-center gap-1.5">
@@ -444,7 +444,7 @@ export default function HowToPlayPage() {
 
             {/* Footer */}
             <footer className="w-full max-w-6xl mx-auto border-t border-slate-200 mt-12 py-8 text-center text-xs text-slate-450 font-bold px-4">
-                &copy; {new Date().getFullYear()} Helge Village. All Rights Reserved. Built on Solana.
+                &copy; {new Date().getFullYear()} Norwyn Village. All Rights Reserved. Built on Robinhood Chain.
             </footer>
         </div>
     );

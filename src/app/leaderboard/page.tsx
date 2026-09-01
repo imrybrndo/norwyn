@@ -92,7 +92,7 @@ export default function LeaderboardPage() {
                         Leaderboard
                     </h1>
                     <p className="text-slate-600 text-sm md:text-base font-semibold mt-2 max-w-md">
-                        Compete with other villagers, grow your farm, and secure your place on the Helge hall of fame!
+                        Compete with other villagers, grow your farm, and secure your place on the Norwyn hall of fame!
                     </p>
                 </div>
 
@@ -167,7 +167,7 @@ export default function LeaderboardPage() {
 
             {/* Simple Footer */}
             <footer className="w-full max-w-5xl mx-auto border-t border-slate-200 mt-12 py-8 text-center text-xs text-slate-450 font-bold px-4">
-                &copy; {new Date().getFullYear()} Helge Village. All Rights Reserved. Built on Solana.
+                &copy; {new Date().getFullYear()} Norwyn Village. All Rights Reserved. Built on Robinhood Chain.
             </footer>
         </div>
     );

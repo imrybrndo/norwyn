@@ -142,7 +142,7 @@ export default function OnboardingFlow({ onBack, onSubmit, isSubmitting }: Onboa
                     >
                         <div>
                             <h2 className="text-xl md:text-2xl font-bold text-amber-500 uppercase">Choose Name</h2>
-                            <p className="text-gray-400 text-xs mt-1">What will other villagers call you in Helge Village?</p>
+                            <p className="text-gray-400 text-xs mt-1">What will other villagers call you in Norwyn Village?</p>
                         </div>
 
                         <div className="flex flex-col gap-2">
