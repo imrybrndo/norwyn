@@ -17,29 +17,11 @@ const SPRITE_SHEET_W = 864; // 9 frames x 96px
 const SPRITE_SHEET_H = 64;
 const SPRITE_CROP = { x: 36, y: 14, w: 24, h: 28 }; // window around the figure in frame 0
 const SPRITE_SCALE = 4;
-const ANSEM_STYLE_ID = 4; // standalone character rendered from its own GIF/spritesheet
 
 function CharacterSprite({ styleId, scale = SPRITE_SCALE }: { styleId: number; scale?: number }) {
     const w = SPRITE_CROP.w * scale;
     const h = SPRITE_CROP.h * scale;
 
-    if (styleId === ANSEM_STYLE_ID) {
-        // Ansem's idle.gif animates natively in the browser; scale the 64x64
-        // frame to the preview height and center it in the same crop box.
-        return (
-            <div
-                style={{
-                    width: w,
-                    height: h,
-                    backgroundImage: 'url(/assets/Characters/Ansem/idle.gif)',
-                    backgroundRepeat: 'no-repeat',
-                    backgroundSize: `${h}px ${h}px`,
-                    backgroundPosition: `${(w - h) / 2}px 0`,
-                    imageRendering: 'pixelated',
-                }}
-            />
-        );
-    }
     const layer = (url: string): React.CSSProperties => ({
         position: 'absolute',
         top: 0,
@@ -107,7 +89,6 @@ export default function OnboardingFlow({ onBack, onSubmit, isSubmitting }: Onboa
         { id: 1, name: 'Bowl Hair' },
         { id: 2, name: 'Curly Hair' },
         { id: 3, name: 'Long Hair' },
-        { id: ANSEM_STYLE_ID, name: 'Ansem' },
     ];
 
     return (
@@ -212,7 +193,7 @@ export default function OnboardingFlow({ onBack, onSubmit, isSubmitting }: Onboa
                         {/* Outfit / Sprite selection */}
                         <div className="flex flex-col gap-2">
                             <label className="text-xs text-amber-400 uppercase font-semibold">Starting Clothes Style</label>
-                            <div className="grid grid-cols-2 gap-3">
+                            <div className="grid grid-cols-3 gap-3">
                                 {styleDetails.map((style) => (
                                     <button
                                         key={style.id}

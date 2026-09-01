@@ -27,29 +27,6 @@ export function createAnimations(scene: Phaser.Scene) {
         repeat: -1
     });
 
-    // 1a. Ansem character animations (standalone body, replaces base+clothes).
-    // Only idle/walk exist; action states fall back gracefully via the
-    // anims.exists() guards at every play site.
-    scene.anims.create({
-        key: 'ansem_walk',
-        frames: scene.anims.generateFrameNumbers('ansem_walk', {
-            start: 0,
-            end: 7
-        }),
-        frameRate: 10,
-        repeat: -1
-    });
-
-    scene.anims.create({
-        key: 'ansem_idle',
-        frames: scene.anims.generateFrameNumbers('ansem_idle', {
-            start: 0,
-            end: 7
-        }),
-        frameRate: 6,
-        repeat: -1
-    });
-
     // 1b. Create Base watering animation
     scene.anims.create({
         key: 'player_base_watering',

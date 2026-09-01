@@ -79,17 +79,6 @@ export class Preloader extends Phaser.Scene {
             });
         }
 
-        // Ansem character (standalone body, no clothes overlay) — strips
-        // pre-rendered from the source GIFs in the same folder
-        this.load.spritesheet('ansem_idle', '/assets/Characters/Ansem/idle_strip8.png', {
-            frameWidth: 64,
-            frameHeight: 64
-        });
-        this.load.spritesheet('ansem_walk', '/assets/Characters/Ansem/walk_strip8.png', {
-            frameWidth: 64,
-            frameHeight: 64
-        });
-
         // Load watering animations
         this.load.spritesheet('player_base_watering', '/assets/Characters/Human/WATERING/base_watering_strip5.png', {
             frameWidth: 96,

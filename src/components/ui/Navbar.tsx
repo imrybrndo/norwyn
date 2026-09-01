@@ -68,7 +68,7 @@ export default function Navbar() {
                         );
                     })}
                     <a
-                        href="https://x.com/norwynvillage"
+                        href="https://x.com/NorwynVillage"
                         target="_blank"
                         rel="noopener noreferrer"
                         className="px-3 py-1.5 rounded-full text-xs font-bold text-slate-605 hover:text-slate-800 transition-colors flex items-center justify-center"
@@ -128,7 +128,7 @@ export default function Navbar() {
                                 );
                             })}
                             <a
-                                href="https://x.com/norwynvillage"
+                                href="https://x.com/NorwynVillage"
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 onClick={() => setIsOpen(false)}

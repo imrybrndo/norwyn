@@ -225,9 +225,14 @@ export default function LandingHero({
                             </span>
                         </h1>
 
-                        <span className="inline-flex items-center gap-1.5 bg-orange-500 text-white border-2 border-slate-900 rounded-lg px-2.5 py-1 text-[9px] md:text-[10px] font-black uppercase tracking-widest shadow-[3px_3px_0_0_#1e293b] mt-1">
-                            <Sparkles className="w-3 h-3" /> A Cozy Web3 Farm on Robinhood Chain
-                        </span>
+                        <div className="flex items-center gap-2 mt-1">
+                            <span className="inline-flex items-center gap-1.5 bg-orange-500 text-white border-2 border-slate-900 rounded-lg px-2.5 py-1 text-[9px] md:text-[10px] font-black uppercase tracking-widest shadow-[3px_3px_0_0_#1e293b]">
+                                <Sparkles className="w-3 h-3" /> A Cozy Web3 Farm on Robinhood Chain
+                            </span>
+                            <span className="font-pixel text-[8px] md:text-[9px] text-white/70 drop-shadow-[0_1px_1px_rgba(0,0,0,0.6)] shrink-0">
+                                v0.1
+                            </span>
+                        </div>
                     </motion.div>
 
                     <motion.p
@@ -256,12 +261,6 @@ export default function LandingHero({
                         })}
                     </motion.div>
 
-                    {/* Version tag */}
-                    <motion.div variants={itemVariants} className="flex items-center gap-2 max-w-full">
-                        <span className="font-pixel text-[8px] md:text-[9px] text-white/70 drop-shadow-[0_1px_1px_rgba(0,0,0,0.6)] shrink-0">
-                            v0.1
-                        </span>
-                    </motion.div>
                 </div>
 
                 {/* ===== RIGHT COLUMN — main menu ===== */}
@@ -269,7 +268,7 @@ export default function LandingHero({
                     {/* Blinking PRESS START prompt */}
                     <motion.p
                         variants={itemVariants}
-                        className="font-pixel text-white text-[10px] md:text-xs tracking-[0.3em] drop-shadow-[0_2px_0_rgba(0,0,0,0.6)]"
+                        className="font-pixel text-white text-[10px] md:text-xs tracking-[0.3em] drop-shadow-[0_2px_0_rgba(0,0,0,0.6)] mb-2"
                     >
                         <motion.span
                             animate={{ opacity: [1, 0.15, 1] }}
@@ -414,7 +413,7 @@ export default function LandingHero({
                                     <FileText className="w-3.5 h-3.5 text-sky-600" /> Docs
                                 </Link>
                                 <a
-                                    href="https://x.com/norwynvillage"
+                                    href="https://x.com/NorwynVillage"
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="flex items-center justify-center gap-1.5 py-2 px-2 bg-white border-2 border-slate-900 rounded-xl text-[9px] md:text-[10px] font-black uppercase tracking-wide text-slate-700 shadow-[2px_2px_0_0_#1e293b] hover:-translate-y-0.5 hover:bg-slate-50 active:translate-y-[1px] active:shadow-none transition-all"

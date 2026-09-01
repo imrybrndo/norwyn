@@ -1,18 +1,6 @@
 import Phaser from 'phaser';
 import { EventBus } from '../EventBus';
 
-// clothesIndex/avatarStyle value that selects the standalone Ansem character
-// (rendered as a single sprite instead of the base body + clothes overlay)
-export const ANSEM_STYLE_INDEX = 4;
-// Ansem's source frames are 64px tall with a ~56px figure (y 4-60); the human
-// figure spans y 20-38 of its frame (-12..+6 from center). Scale/offset map
-// Ansem into that exact box so his height matches other players and the
-// username label above doesn't cover his head.
-export const ANSEM_SCALE = 0.32;
-export const ANSEM_Y_OFFSET = -3;
-// The human sheets face right; Ansem's sheets face left, so his flip is inverted
-export const ANSEM_FACES_LEFT = true;
-
 export class Player extends Phaser.GameObjects.Container {
     bodySprite: Phaser.GameObjects.Sprite;
     clothesSprite: Phaser.GameObjects.Sprite;
@@ -45,27 +33,20 @@ export class Player extends Phaser.GameObjects.Container {
     hasCompletedCasting: boolean = false;
     offlinePreRolled: { fishType: string, fishName: string, expGained: number } | null = null;
 
-    isAnsem: boolean = false;
     facingLeft: boolean = false;
 
     constructor(scene: Phaser.Scene, x: number, y: number, username: string, clothesIndex: number) {
         super(scene, x, y);
         this.username = username;
         this.clothesIndex = clothesIndex;
-        this.isAnsem = clothesIndex === ANSEM_STYLE_INDEX;
 
-        // Base Body Layer (Ansem is a standalone sprite with no clothes overlay)
-        this.bodySprite = scene.add.sprite(0, 0, this.isAnsem ? 'ansem_idle' : 'player_base_idle', 0);
+        // Base Body Layer
+        this.bodySprite = scene.add.sprite(0, 0, 'player_base_idle', 0);
         this.bodySprite.setOrigin(0.5, 0.5);
-        if (this.isAnsem) {
-            this.bodySprite.setScale(ANSEM_SCALE);
-            this.bodySprite.y = ANSEM_Y_OFFSET;
-        }
 
         // Clothes Layer
-        this.clothesSprite = scene.add.sprite(0, 0, `player_clothes_idle_${this.isAnsem ? 1 : clothesIndex}`, 0);
+        this.clothesSprite = scene.add.sprite(0, 0, `player_clothes_idle_${clothesIndex}`, 0);
         this.clothesSprite.setOrigin(0.5, 0.5);
-        if (this.isAnsem) this.clothesSprite.setVisible(false);
 
         // Tool Layer
         this.toolSprite = scene.add.sprite(0, 0, 'player_tools_watering', 0);
@@ -205,20 +186,17 @@ export class Player extends Phaser.GameObjects.Container {
         });
     }
 
-    // Ansem has his own idle/walk sheets; his action states (watering, fishing)
-    // don't exist, so the exists() guard simply keeps the current animation.
     playBodyAnim(state: string) {
-        const key = this.isAnsem ? `ansem_${state}` : `player_base_${state}`;
+        const key = `player_base_${state}`;
         if (this.scene.anims.exists(key)) {
             this.bodySprite.play(key, true);
         }
     }
 
-    // Single place that turns a logical facing into per-sprite flips: human
-    // sheets and tools face right natively, Ansem's sheets face left.
+    // Single place that turns a logical facing into per-sprite flips.
     setFacing(facingLeft: boolean) {
         this.facingLeft = facingLeft;
-        this.bodySprite.setFlipX(this.isAnsem && ANSEM_FACES_LEFT ? !facingLeft : facingLeft);
+        this.bodySprite.setFlipX(facingLeft);
         this.clothesSprite.setFlipX(facingLeft);
         this.toolSprite.setFlipX(facingLeft);
     }
