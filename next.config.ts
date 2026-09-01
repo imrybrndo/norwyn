@@ -1,6 +1,14 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Next.js 16.2.x Turbopack dev bug (vercel/next.js#94915, #81161, #94735):
+  // the FS cache never prunes and server Fast Refresh can enter a
+  // recompile/invalidate loop, spawning unbounded .next/dev/build worker
+  // processes until RAM is exhausted. Disable both until upstream fixes it.
+  experimental: {
+    turbopackFileSystemCacheForDev: false,
+    turbopackServerFastRefresh: false,
+  },
   // Kunci root ke folder project ini agar Turbopack tidak naik ke ~/Documents
   // (ada lockfile nyasar di sana yang tidak bisa dibaca karena proteksi macOS).
   turbopack: {
