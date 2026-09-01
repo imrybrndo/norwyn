@@ -18,11 +18,12 @@ const pressStart2P = Press_Start_2P({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://www.norwynvillage.com"),
   title: "Norwyn Village - 2D Web3 Farming RPG",
   description: "A multiplayer web3 2D top-down farming simulation game built on Robinhood Chain.",
-  icons: {
-    icon: "/Logo-Transparant.png",
-  },
+  // Favicon and the og:image/twitter:image share previews come from the
+  // app/icon.png and app/opengraph-image.png/twitter-image.png file
+  // conventions — Next.js wires up the <link>/<meta> tags automatically.
 };
 
 export default function RootLayout({

@@ -203,15 +203,15 @@ export default function LandingHero({
                         <motion.div
                             animate={{ y: [0, -6, 0] }}
                             transition={{ duration: 3.5, repeat: Infinity, ease: 'easeInOut' }}
-                            className="relative w-16 h-16 md:w-20 md:h-20 drop-shadow-[0_5px_0_rgba(0,0,0,0.4)]"
+                            className="relative w-16 h-16 md:w-20 md:h-20 rounded-xl overflow-hidden drop-shadow-[0_5px_0_rgba(0,0,0,0.4)]"
                         >
                             <Image
-                                src="/Logo-Transparant.png"
+                                src="/Norwhyn.jpeg"
                                 alt="Norwyn Village"
                                 fill
                                 sizes="80px"
                                 priority
-                                style={{ objectFit: 'contain' }}
+                                style={{ objectFit: 'cover' }}
                                 className="select-none pointer-events-none"
                             />
                         </motion.div>

@@ -33,14 +33,14 @@ export default function Navbar() {
             >
                 {/* Logo */}
                 <Link href="/" className="flex items-center gap-2 cursor-pointer group">
-                    <div className="relative w-8 h-8 group-hover:scale-105 transition-transform duration-200">
-                        <Image 
-                            src="/Logo-Transparant.png" 
-                            alt="Norwyn Village Logo" 
+                    <div className="relative w-8 h-8 rounded-[6px] overflow-hidden group-hover:scale-105 transition-transform duration-200">
+                        <Image
+                            src="/Norwhyn.jpeg"
+                            alt="Norwyn Village Logo"
                             fill
                             sizes="32px"
                             priority
-                            style={{ objectFit: 'contain' }}
+                            style={{ objectFit: 'cover' }}
                             className="select-none"
                         />
                     </div>
